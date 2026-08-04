@@ -199,9 +199,9 @@ public:
         , sliding_window_right(FFT_SIZE)
         , forward_plan(FFT_SIZE, FFTW_FORWARD, compute_cache_left, compute_cache_right, FFTW_ESTIMATE)
         , backward_plan(FFT_SIZE, FFTW_BACKWARD, compute_cache_right, compute_cache_left, FFTW_ESTIMATE)
-        , ir(0)
-        , delay_left(0)
-        , delay_right(0)
+        , ir(1)
+        , delay_left(1)
+        , delay_right(1)
         , valid_channels(0) {
 
         reset();
