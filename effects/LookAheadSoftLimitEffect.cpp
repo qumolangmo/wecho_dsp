@@ -41,10 +41,10 @@ void LookAheadSoftLimitEffect::copyParamsFrom(const LookAheadSoftLimitEffect& ot
     this->setEnabled(other.isEnabled());
 }
 
-void LookAheadSoftLimitEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
+void LookAheadSoftLimitEffect::run(std::span<float> audio) {
     static_assert((bufferType() == BufferType::INTERLEAVED), "LookAheadSoftLimitEffect run with non-interleaved buffer type");
 
-    for (int i = 0; i < SAMPLES_LENGTH_PER_FRAME; i += 2) {
+    for (int i = 0; i < audio.size(); i += 2) {
         auto [l, r] = software_limiter.process(audio[i], audio[i + 1]);
 
         audio[i] = l;

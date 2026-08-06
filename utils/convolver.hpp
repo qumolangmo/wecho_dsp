@@ -32,12 +32,9 @@
 #include <algorithm>
 #include <fstream>
 #include <span>
+#include "utils.h"
 
-static constexpr int FRAME_SIZE_PER_CHANNEL = 512;
-static constexpr int FFT_SIZE = 2 * FRAME_SIZE_PER_CHANNEL;
-static constexpr int SAMPLES_LENGTH_PER_FRAME = FRAME_SIZE_PER_CHANNEL * 2;
-
-class FFTWFComplexArray {
+class FFTWFComplexArray: public Utils {
 private:
     struct FFTWFMemoryDeleter {
         void operator()(fftwf_complex* ptr) {
@@ -49,7 +46,7 @@ private:
     int n;
 
 public:
-    explicit FFTWFComplexArray(int n = FFT_SIZE)
+    explicit FFTWFComplexArray(int n = getSamplesPerChannel() * 2)
         : n(n)
         , data(nullptr) {
 
@@ -99,7 +96,7 @@ public:
 
 };
 
-class FFTWFPlan {
+class FFTWFPlan: public Utils {
 private:
     struct FFTWFPlanDeleter {
         void operator()(fftwf_plan ptr) {
@@ -140,7 +137,7 @@ public:
             if (std::filesystem::exists(version_path)) {
                 std::ifstream ver_file(version_path);
                 int stored_fft_size = 0;
-                if (ver_file >> stored_fft_size && stored_fft_size != FFT_SIZE) {
+                if (ver_file >> stored_fft_size && stored_fft_size != (getSamplesPerChannel() * 2)) {
                     std::filesystem::remove(wisdom_path);
                     std::filesystem::remove(version_path);
                 }
@@ -152,12 +149,12 @@ public:
         if (!std::filesystem::exists(wisdom_path)) {
             importWisdom();
 
-            FFTWFComplexArray tmp(FFT_SIZE);
-            FFTWFPlan plan(FFT_SIZE, FFTW_FORWARD, tmp, tmp, FFTW_MEASURE);
-            FFTWFPlan backward_plan(FFT_SIZE, FFTW_BACKWARD, tmp, tmp, FFTW_MEASURE);
+            FFTWFComplexArray tmp(getSamplesPerChannel() * 2);
+            FFTWFPlan plan(getSamplesPerChannel() * 2, FFTW_FORWARD, tmp, tmp, FFTW_MEASURE);
+            FFTWFPlan backward_plan(getSamplesPerChannel() * 2, FFTW_BACKWARD, tmp, tmp, FFTW_MEASURE);
 
             std::ofstream ver_file(version_path);
-            ver_file << FFT_SIZE;
+            ver_file << getSamplesPerChannel() * 2;
         } else {
             importWisdom();
         }
@@ -189,16 +186,20 @@ public:
     }
 };
 
-class Convolver {
+class Convolver: public Utils {
 public:
     Convolver()
-        : samples(4, std::vector<float>(MAX_SAMPLES_PER_CHANNEL))
-        , compute_cache_left(FFT_SIZE)
-        , compute_cache_right(FFT_SIZE)
-        , sliding_window_left(FFT_SIZE)
-        , sliding_window_right(FFT_SIZE)
-        , forward_plan(FFT_SIZE, FFTW_FORWARD, compute_cache_left, compute_cache_right, FFTW_ESTIMATE)
-        , backward_plan(FFT_SIZE, FFTW_BACKWARD, compute_cache_right, compute_cache_left, FFTW_ESTIMATE)
+        : Utils()
+        , samples(4, std::vector<float>(MAX_SAMPLES_PER_CHANNEL))
+        , compute_cache_left(fft_size)
+        , compute_cache_right(fft_size)
+        , sliding_window_left(fft_size)
+        , sliding_window_right(fft_size)
+        , forward_plan(fft_size, FFTW_FORWARD, compute_cache_left, compute_cache_right, FFTW_ESTIMATE)
+        , backward_plan(fft_size, FFTW_BACKWARD, compute_cache_right, compute_cache_left, FFTW_ESTIMATE)
+        , cache(fft_size)
+        , acc_left(fft_size)
+        , acc_right(fft_size)
         , ir(1)
         , delay_left(1)
         , delay_right(1)
@@ -258,7 +259,7 @@ public:
 
         normalize();
 
-        this->ir.resize(std::ceil(samples[0].size() / (float)FRAME_SIZE_PER_CHANNEL));
+        this->ir.resize(std::ceil(samples[0].size() / (float)samples_per_channel));
 
         delay_left.resize(this->ir.size());
         delay_right.resize(this->ir.size());
@@ -274,12 +275,12 @@ public:
             for (int j = 0; j < valid_channels; j++) {
                 int k;
 
-                for (k = 0; k < FRAME_SIZE_PER_CHANNEL && i * FRAME_SIZE_PER_CHANNEL + k < samples[j].size(); k++) {
-                    this->ir[i][j][k][0] = samples[j][i * FRAME_SIZE_PER_CHANNEL + k];
+                for (k = 0; k < samples_per_channel && i * samples_per_channel + k < samples[j].size(); k++) {
+                    this->ir[i][j][k][0] = samples[j][i * samples_per_channel + k];
                     this->ir[i][j][k][1] = 0.0f;
                 }
 
-                memset(this->ir[i][j].get() + k, 0, (FFT_SIZE - k) * sizeof(fftwf_complex));
+                memset(this->ir[i][j].get() + k, 0, (fft_size - k) * sizeof(fftwf_complex));
 
                 forward_plan.execute(this->ir[i][j], this->ir[i][j]);
             }
@@ -294,30 +295,30 @@ public:
         setIr(samples, valid_channels);
     }
 
-    void convolve(const std::span<const float, SAMPLES_LENGTH_PER_FRAME> input_frame, std::span<float, SAMPLES_LENGTH_PER_FRAME> output_frame) {
+    void convolve(const std::span<const float> input_frame, std::span<float> output_frame) {
         float mix_factor = mix.load(std::memory_order_relaxed);
 
         std::array<std::span<const float>, 2> input = {{
-            std::span<const float>(input_frame.data(), FRAME_SIZE_PER_CHANNEL),
-            std::span<const float>(input_frame.data() + FRAME_SIZE_PER_CHANNEL, FRAME_SIZE_PER_CHANNEL),
+            std::span<const float>(input_frame.data(), samples_per_channel),
+            std::span<const float>(input_frame.data() + samples_per_channel, samples_per_channel),
         }};
 
         std::array<std::span<float>, 2> output = {{
-            std::span<float>(output_frame.data(), FRAME_SIZE_PER_CHANNEL),
-            std::span<float>(output_frame.data() + FRAME_SIZE_PER_CHANNEL, FRAME_SIZE_PER_CHANNEL),
+            std::span<float>(output_frame.data(), samples_per_channel),
+            std::span<float>(output_frame.data() + samples_per_channel, samples_per_channel),
         }};
 
         memcpy(sliding_window_left.get(),
-                sliding_window_left.get() + FRAME_SIZE_PER_CHANNEL,
-                (FFT_SIZE - FRAME_SIZE_PER_CHANNEL) * sizeof(fftwf_complex));
+                sliding_window_left.get() + samples_per_channel,
+                (fft_size - samples_per_channel) * sizeof(fftwf_complex));
         memcpy(sliding_window_right.get(),
-                sliding_window_right.get() + FRAME_SIZE_PER_CHANNEL,
-                (FFT_SIZE - FRAME_SIZE_PER_CHANNEL) * sizeof(fftwf_complex));
+                sliding_window_right.get() + samples_per_channel,
+                (fft_size - samples_per_channel) * sizeof(fftwf_complex));
 
-        for (int i = FRAME_SIZE_PER_CHANNEL; i < FFT_SIZE; i++) {
-            if ((i - FRAME_SIZE_PER_CHANNEL) < input[0].size()) {
-                sliding_window_left[i][0] = input[0][i - FRAME_SIZE_PER_CHANNEL];
-                sliding_window_right[i][0] = input[1][i - FRAME_SIZE_PER_CHANNEL];
+        for (int i = samples_per_channel; i < fft_size; i++) {
+            if ((i - samples_per_channel) < input[0].size()) {
+                sliding_window_left[i][0] = input[0][i - samples_per_channel];
+                sliding_window_right[i][0] = input[1][i - samples_per_channel];
                 sliding_window_left[i][1] = 0.0f;
                 sliding_window_right[i][1] = 0.0f;
             } else {
@@ -347,9 +348,9 @@ public:
         backward_plan.execute(compute_cache_right, compute_cache_right);
 
         for (int i = 0; i < input[0].size(); i++) {
-            output[0][i] = (compute_cache_left[i + FRAME_SIZE_PER_CHANNEL][0] / FFT_SIZE) 
+            output[0][i] = (compute_cache_left[i + samples_per_channel][0] / fft_size) 
                 * mix_factor + (1.0f - mix_factor) * input[0][i];
-            output[1][i] = (compute_cache_right[i + FRAME_SIZE_PER_CHANNEL][0] / FFT_SIZE) 
+            output[1][i] = (compute_cache_right[i + samples_per_channel][0] / fft_size) 
                 * mix_factor + (1.0f - mix_factor) * input[1][i];
         }
 
@@ -365,8 +366,8 @@ private:
 
     template<int VALID_CHANNELS>
     void multiply() {
-        fftwf_complex acc_left[FFT_SIZE] = {0};
-        fftwf_complex acc_right[FFT_SIZE] = {0};
+        acc_left.init(0);
+        acc_right.init(0);
 
         for (int i = 0; i < this->ir.size(); i++) {
             const auto& dl = delay_left[i];
@@ -376,7 +377,7 @@ private:
             const auto& ir2 = this->ir[i][2];
             const auto& ir3 = this->ir[i][3];
 
-            for (int j = 0; j < FFT_SIZE; j++) {
+            for (int j = 0; j < fft_size; j++) {
                 acc_left[j][0] +=
                     dl[j][0] * ir0[j][0] - dl[j][1] * ir0[j][1];
                 acc_left[j][1] +=
@@ -389,7 +390,7 @@ private:
                 }
             }
 
-            for (int j = 0; j < FFT_SIZE; j++) {
+            for (int j = 0; j < fft_size; j++) {
                 acc_right[j][0] +=
                     dr[j][0] * ir1[j][0] - dr[j][1] * ir1[j][1];
                 acc_right[j][1] +=
@@ -402,9 +403,9 @@ private:
                 }
             }
         }
-        
-        memcpy(compute_cache_left.get(), acc_left, sizeof(acc_left));
-        memcpy(compute_cache_right.get(), acc_right, sizeof(acc_right));
+
+        memcpy(compute_cache_left.get(), acc_left.get(), sizeof(fftwf_complex) * fft_size);
+        memcpy(compute_cache_right.get(), acc_right.get(), sizeof(fftwf_complex) * fft_size);
     }
 
     /* max load 65536 samples per channel */
@@ -458,7 +459,13 @@ private:
         return true;
     }
 
-    fftwf_complex cache[FFT_SIZE];
+    int samples_per_channel = getSamplesPerChannel();
+    int fft_size = getSamplesPerChannel() * 2;
+    int samples_per_frame = getSamplesPerChannel() * getChannels();
+
+    FFTWFComplexArray cache;
+    FFTWFComplexArray acc_left;
+    FFTWFComplexArray acc_right;
 
     AudioFile<float> ir_file;
 

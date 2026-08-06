@@ -20,7 +20,7 @@
 #include "effect.hpp"
 
 DiffSurroundingEffect::DiffSurroundingEffect(bool enabled, int delay_ms) : Effect(enabled), delay_ms(delay_ms) {
-    delay_line.setDelay(delay_ms / 1000.0f * SAMPLE_RATE);
+    delay_line.setDelay(delay_ms / 1000.0f * sample_rate);
     hp_800.setHighPass(250.0f);
     lp_800.setLowPass(250.0f);
 }
@@ -29,10 +29,10 @@ DiffSurroundingEffect::~DiffSurroundingEffect() {
     delay_ms.store(0);
 }
 
-void DiffSurroundingEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
+void DiffSurroundingEffect::run(std::span<float> audio) {
     static_assert((bufferType() == BufferType::INTERLEAVED), "DiffSurroundingEffect run with non-interleaved buffer type");
 
-    for (int i = 0; i < SAMPLES_LENGTH_PER_FRAME; i += 2) {
+    for (int i = 0; i < audio.size(); i += 2) {
         float hp_r = hp_800.process(audio[i + 1]);
         float lp_r = lp_800.process(audio[i + 1]);
 
@@ -54,7 +54,7 @@ void DiffSurroundingEffect::reset() {
 void DiffSurroundingEffect::setDelayMs(int delay_ms) {
     this->delay_ms.store(delay_ms, std::memory_order_release);
 
-    delay_line.setDelay(delay_ms / 1000.0f * SAMPLE_RATE);
+    delay_line.setDelay(delay_ms / 1000.0f * sample_rate);
 }
 
 void DiffSurroundingEffect::copyParamsFrom(const DiffSurroundingEffect& other) {

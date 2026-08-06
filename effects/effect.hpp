@@ -38,15 +38,15 @@
 #define M_PI 3.14159265358
 #endif
 
-class Effect {
+class Effect: public Utils {
 private:
     std::atomic<bool> enabled;
 public:
-    static constexpr int SAMPLE_RATE = 48000;
-    static constexpr int SAMPLES_LENGTH_PER_CHANNEL = 512;
-    static constexpr int SAMPLES_LENGTH_PER_FRAME = SAMPLES_LENGTH_PER_CHANNEL * 2;
+    int sample_rate = getSampleRate();
+    int samples_per_channel = getSamplesPerChannel();
+    int samples_per_frame = getSamplesPerChannel() * getChannels();
 public:
-    virtual void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) = 0;
+    virtual void run(std::span<float> audio) = 0;
     virtual Priority priority() const = 0;
     virtual void reset() = 0;
     virtual ~Effect() = default;
@@ -64,7 +64,7 @@ public:
 
 class BassEffect: public Effect {
 public:
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) override;
+    void run(std::span<float> audio) override;
     Priority priority() const override;
     void reset() override;
 
@@ -87,7 +87,7 @@ private:
 
 class ClarityEffect: public Effect {
 public:
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) override;
+    void run(std::span<float> audio) override;
     Priority priority() const override;
     void reset() override;
 
@@ -110,7 +110,7 @@ private:
 
 class GainEffect: public Effect {
 public:
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) override;
+    void run(std::span<float> audio) override;
     Priority priority() const override;
     void reset() override;
 
@@ -127,7 +127,7 @@ private:
 
 class ChannelBalanceEffect: public Effect {
 public:
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) override;
+    void run(std::span<float> audio) override;
     Priority priority() const override;
     void reset() override;
 
@@ -145,7 +145,7 @@ private:
 
 class EvenHarmonicEffect: public Effect {
 public:
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) override;
+    void run(std::span<float> audio) override;
     Priority priority() const override;
     void reset() override;
 
@@ -168,7 +168,7 @@ private:
     float env_band3_l, env_band3_r, processed_env_band3_l, processed_env_band3_r;
     float env_band4_l, env_band4_r, processed_env_band4_l, processed_env_band4_r;
 
-    static constexpr float envelope_rate = 2 * M_PI * 50 / SAMPLE_RATE;
+    float envelope_rate = 2 * M_PI * 50 / sample_rate;
 
     LinkwitzRiley4Order<BAND_PASS> band1[2];
     LinkwitzRiley4Order<BAND_PASS> band2[2];
@@ -189,7 +189,7 @@ private:
 
 class ConvolveEffect: public Effect {
 public:
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) override;
+    void run(std::span<float> audio) override;
     Priority priority() const override;
     void reset() override;
 
@@ -213,7 +213,7 @@ private:
 
 class CompressorEffect: public Effect {
 public:
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) override;
+    void run(std::span<float> audio) override;
     Priority priority() const override;
     void reset() override;
 
@@ -235,7 +235,7 @@ private:
 
 class VirtualBassEffect: public Effect {
 public:
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) override;
+    void run(std::span<float> audio) override;
     Priority priority() const override;
     void reset() override;
 
@@ -277,7 +277,7 @@ private:
 
 class LookAheadSoftLimitEffect: public Effect {
 public:
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) override;
+    void run(std::span<float> audio) override;
     Priority priority() const override;
     void reset() override;
 
@@ -293,7 +293,7 @@ private:
 
 class LowCatEffect: public Effect {
 public:
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) override;
+    void run(std::span<float> audio) override;
     Priority priority() const override;
     void reset() override;
 
@@ -312,7 +312,7 @@ private:
 
 class IIREqualizerEffect: public Effect {
 public:
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) override;
+    void run(std::span<float> audio) override;
     Priority priority() const override;
     void reset() override;
 
@@ -331,7 +331,7 @@ private:
 
 class ReverbEffect: public Effect {
 public:
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) override;
+    void run(std::span<float> audio) override;
     Priority priority() const override;
     void reset() override;
 
@@ -450,7 +450,7 @@ public:
     void setCode(std::string code);
     void setParams(ScriptParamsArray params);
 
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) override;
+    void run(std::span<float> audio) override;
     Priority priority() const override;
     void reset() override;
 
@@ -481,7 +481,7 @@ public:
     DiffSurroundingEffect(bool enabled, int delay_ms);
     ~DiffSurroundingEffect();
 
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) override;
+    void run(std::span<float> audio) override;
     Priority priority() const override;
     void reset() override;
 

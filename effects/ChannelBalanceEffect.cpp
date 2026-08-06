@@ -55,7 +55,7 @@ void ChannelBalanceEffect::setBalance(float balance) {
     }
 }
 
-void ChannelBalanceEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
+void ChannelBalanceEffect::run(std::span<float> audio) {
     static_assert((bufferType() == BufferType::INTERLEAVED), "ChannelBalanceEffect run with non-interleaved buffer type");
 
     float _left_gain = left_gain.load(std::memory_order_relaxed);
@@ -63,7 +63,7 @@ void ChannelBalanceEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio)
 
     if (std::fabs(_left_gain) < 0.00001f && std::fabs(_right_gain) < 0.00001f) return;
 
-    for (int i = 0; i < SAMPLES_LENGTH_PER_FRAME; i += 2) {
+    for (int i = 0; i < audio.size(); i += 2) {
         audio[i] *= _left_gain;
         audio[i + 1] *= _right_gain;
     }

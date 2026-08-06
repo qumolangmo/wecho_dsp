@@ -44,12 +44,12 @@ IIREqualizerEffect::IIREqualizerEffect(bool enabled)
 }
 IIREqualizerEffect::~IIREqualizerEffect() {}
 
-void IIREqualizerEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
+void IIREqualizerEffect::run(std::span<float> audio) {
     static_assert((bufferType() == BufferType::INTERLEAVED), "IREqualizerEffect run with non-interleaved buffer type");
 
     float origin_l, origin_r;
 
-    for (int i = 0; i < SAMPLES_LENGTH_PER_FRAME; i += 2) {
+    for (int i = 0; i < audio.size(); i += 2) {
         origin_l = audio[i];
         origin_r = audio[i + 1];
 

@@ -34,6 +34,7 @@ set(WECHO_DSP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/effects/ScriptEffect.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/effects/DiffSurroundingEffect.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/scripting/wecho_dsp_c_impl.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/utils.cpp
 )
 
 add_library(wecho_dsp STATIC ${WECHO_DSP_SOURCES})

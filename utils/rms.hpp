@@ -18,11 +18,13 @@
  */
 #ifndef __RMS_HPP__
 #define __RMS_HPP__
-#include <vector>
 
-class RMS {
+#include <vector>
+#include "utils.h"
+
+class RMS: public Utils {
 private:
-    static constexpr int SAMPLE_RATE = 48000;
+    int sample_rate = getSampleRate();
     std::vector<float> buffer;
     float attack_ms, release_ms, window_ms;
     float attack_coeff;
@@ -46,26 +48,26 @@ public:
         , envelope(0.0f) {
         
         /* 100ms */
-        buffer.reserve(SAMPLE_RATE / 10);
+        buffer.reserve(sample_rate / 10);
     }
 
     ~RMS() = default;
 
     void setWindowMs(int ms) {
         window_ms = ms;
-        buffer.resize(SAMPLE_RATE / 1000 * ms);
+        buffer.resize(sample_rate / 1000 * ms);
         std::fill(buffer.begin(), buffer.end(), 0.0f);
         rms_idx = 0;
     }
 
     void setAttackMs(int ms) {
         attack_ms = ms;
-        attack_coeff = 1.0f - std::exp(-1.0f / (SAMPLE_RATE / 1000.0f * ms));
+        attack_coeff = 1.0f - std::exp(-1.0f / (sample_rate / 1000.0f * ms));
     }
 
     void setReleaseMs(int ms) {
         release_ms = ms;
-        release_coeff = 1.0f - std::exp(-1.0f / (SAMPLE_RATE / 1000.0f * ms));
+        release_coeff = 1.0f - std::exp(-1.0f / (sample_rate / 1000.0f * ms));
     }
 
     void setMakeupGain(float gain) {

@@ -21,20 +21,21 @@
 #define __TRANSIENT_DETECTOR_H__
 
 #include <cmath>
+#include "utils.h"
 
-class TransientDetector {
+class TransientDetector: public Utils {
 private:
     float env, gain;
     float attack_c, release_c;
-    static constexpr int SAMPLE_RATE = 48000;
+    int sample_rate = getSampleRate();
 
 public:
     TransientDetector(float attack_s, float release_s, float gain)
         : env(0)
         , gain(gain) {
 
-        attack_c = 1 - std::exp(-1 / (SAMPLE_RATE * attack_s));
-        release_c = std::exp(-1 / (SAMPLE_RATE * release_s));
+        attack_c = 1 - std::exp(-1 / (sample_rate * attack_s));
+        release_c = std::exp(-1 / (sample_rate * release_s));
     }
 
     float process(float x) {
@@ -56,11 +57,11 @@ public:
     }
 
     void setAttack(float attack_s) {
-        attack_c = 1 - std::exp(-1 / (SAMPLE_RATE * attack_s));
+        attack_c = 1 - std::exp(-1 / (sample_rate * attack_s));
     }
 
     void setRelease(float release_s) {
-        release_c = std::exp(-1 / (SAMPLE_RATE * release_s));
+        release_c = std::exp(-1 / (sample_rate * release_s));
     }
 };
 
@@ -69,7 +70,7 @@ private:
     float last_env;
     float env;
     float attack_c, release_c;
-    static constexpr int SAMPLE_RATE = 48000;
+    static constexpr int sample_rate = 48000;
 
 public:
     EnvelopeDetector(float attack_s, float release_s)
@@ -80,11 +81,11 @@ public:
     }
 
     void setAttack(float attack_s) {
-        attack_c = 1 - std::exp(-1 / (SAMPLE_RATE * attack_s));
+        attack_c = 1 - std::exp(-1 / (sample_rate * attack_s));
     }
 
     void setRelease(float release_s) {
-        release_c = std::exp(-1 / (SAMPLE_RATE * release_s));
+        release_c = std::exp(-1 / (sample_rate * release_s));
     }
 
     float process(float x) {

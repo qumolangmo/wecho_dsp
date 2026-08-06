@@ -25,6 +25,7 @@
 #include <string>
 #include <cstring>
 #include <cmath>
+#include "../utils/utils.h"
 
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
@@ -57,7 +58,7 @@ struct CHarmonic {
 };
 
 std::vector<std::vector<float>> _ir_cache(2, std::vector<float>(65536));
-std::array<float, SAMPLES_LENGTH_PER_FRAME> _io_cache;
+std::vector<float> _io_cache(Utils::getSamplesPerChannel());
 
 #ifdef __cplusplus
 extern "C" {
@@ -157,7 +158,7 @@ float biquad_process(Biquad_ ctx, float input) {
 
 void biquad_process_block(Biquad_ ctx, float* input, float* output) {
     if (unlikely(!ctx)) { _set_c_api_error("biquad_process_block: ctx is null pointer"); return; }
-    for (int i = 0; i < 512; i++) {
+    for (int i = 0; i < Utils::getSamplesPerChannel(); i++) {
         output[i] = ctx->biquad.process(input[i]);
     }
 }
@@ -194,7 +195,7 @@ float delay_line_read(DelayLine_ ctx) {
 
 void delay_line_read_block(DelayLine_ ctx, float* output) {
     if (unlikely(!ctx)) { _set_c_api_error("delay_line_read_block: ctx is null pointer"); return; }
-    for (int i = 0; i < 512; i++) {
+    for (int i = 0; i < Utils::getSamplesPerChannel(); i++) {
         output[i] = ctx->delay_line.read();
     }
 }
@@ -206,7 +207,7 @@ void delay_line_write(DelayLine_ ctx, float input) {
 
 void delay_line_write_block(DelayLine_ ctx, float* input) {
     if (unlikely(!ctx)) { _set_c_api_error("delay_line_write_block: ctx is null pointer"); return; }
-    for (int i = 0; i < 512; i++) {
+    for (int i = 0; i < Utils::getSamplesPerChannel(); i++) {
         ctx->delay_line.write(input[i]);
     }
 }
@@ -218,7 +219,7 @@ float delay_line_process(DelayLine_ ctx, float input) {
 
 void delay_line_process_block(DelayLine_ ctx, float* input, float* output) {
     if (unlikely(!ctx)) { _set_c_api_error("delay_line_process_block: ctx is null pointer"); return; }
-    for (int i = 0; i < 512; i++) {
+    for (int i = 0; i < Utils::getSamplesPerChannel(); i++) {
         output[i] = ctx->delay_line.process(input[i]);
     }
 }
@@ -260,12 +261,12 @@ void convolver_process_block(Convolver_ ctx, float* input_l, float* input_r, flo
         _set_c_api_error("convolver_process_block: ctx is null pointer");
         return;
     }
-    memcpy(_io_cache.begin(), input_l, 512);
-    memcpy(_io_cache.begin() + 512, input_r, 512);
+    memcpy(_io_cache.data(), input_l, Utils::getSamplesPerChannel());
+    memcpy(_io_cache.data() + Utils::getSamplesPerChannel(), input_r, Utils::getSamplesPerChannel());
     
     ctx->convolver.convolve(_io_cache, _io_cache);
-    std::memcpy(output_l, _io_cache.begin(), sizeof(float) * 512);
-    std::memcpy(output_r, _io_cache.begin() + 512, sizeof(float) * 512);
+    std::memcpy(output_l, _io_cache.data(), sizeof(float) * Utils::getSamplesPerChannel());
+    std::memcpy(output_r, _io_cache.data() + Utils::getSamplesPerChannel(), sizeof(float) * Utils::getSamplesPerChannel());
 }
 
 /****************************************************Chebychev Harmonic Generator**************************************************** */
@@ -300,7 +301,7 @@ float harmonic_process(Harmonic_ ctx, float input) {
 
 void harmonic_process_block(Harmonic_ ctx, float* input, float* output) {
     if (unlikely(!ctx)) { _set_c_api_error("harmonic_process_block: ctx is null pointer"); return; }
-    for (int i = 0; i < 512; i++) {
+    for (int i = 0; i < Utils::getSamplesPerChannel(); i++) {
         output[i] = ctx->harmonic.process(input[i]);
     }
 }

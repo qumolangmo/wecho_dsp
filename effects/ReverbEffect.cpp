@@ -31,12 +31,12 @@ ReverbEffect::ReverbEffect(bool enabled)
     , matrix_type(0) {
 
     for (int i = 0; i < fdn_delay.size(); i++) {
-        fdn_delay[i].setDelay(static_cast<int>(delay_sec[i] * (0.5f + 1.5f * room_size) *SAMPLE_RATE));
+        fdn_delay[i].setDelay(static_cast<int>(delay_sec[i] * (0.5f + 1.5f * room_size) * sample_rate));
         z1[i] = 0.0f;
     }
 
     mod_phase = 0.0f;
-    pre_delay_samples = pre_delay_ms * SAMPLE_RATE / 1000;
+    pre_delay_samples = pre_delay_ms * sample_rate / 1000;
 
     pre_delay_l.setDelay(pre_delay_samples);
     pre_delay_r.setDelay(pre_delay_samples);
@@ -63,7 +63,7 @@ void ReverbEffect::setRoomSize(float room_size) {
     this->room_size.store(room_size, std::memory_order_release);
 
     for (int i = 0; i < fdn_delay.size(); i++) {
-        fdn_delay[i].setDelay(static_cast<int>(delay_sec[i] * (0.5f + 1.5f * room_size) *SAMPLE_RATE));
+        fdn_delay[i].setDelay(static_cast<int>(delay_sec[i] * (0.5f + 1.5f * room_size) * sample_rate));
     }
 }
 
@@ -89,7 +89,7 @@ void ReverbEffect::setModFreq(float mod_freq) {
 
 void ReverbEffect::setPreDelay(int pre_delay_ms) {
     pre_delay_ms = std::max(0, std::min(200, pre_delay_ms));
-    pre_delay_samples = pre_delay_ms * SAMPLE_RATE / 1000;
+    pre_delay_samples = pre_delay_ms * sample_rate / 1000;
 
     this->pre_delay_ms.store(pre_delay_ms, std::memory_order_release);
 
@@ -134,7 +134,7 @@ void ReverbEffect::applyFeedbackMatrix(std::array<float, NUM_DELAY>& sample, int
     sample = std::move(tmp);
 }
 
-void ReverbEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
+void ReverbEffect::run(std::span<float> audio) {
     static_assert((bufferType() == BufferType::INTERLEAVED), "ReverbEffect run with non-interleaved buffer type");
 
     float mod_depth_factor = mod_depth.load(std::memory_order_relaxed) * 2.0f;
@@ -142,10 +142,10 @@ void ReverbEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
     float damping_factor = 1.0f - damping.load(std::memory_order_relaxed) * 0.6f;
     float stereo_width_factor = stereo_width.load(std::memory_order_relaxed);
 
-    float phase_delta = 2.0f * M_PI * mod_freq.load(std::memory_order_relaxed) / SAMPLE_RATE;
+    float phase_delta = 2.0f * M_PI * mod_freq.load(std::memory_order_relaxed) / sample_rate;
     int matrix_type_factor = matrix_type.load(std::memory_order_relaxed);
 
-    for (int i = 0; i < SAMPLES_LENGTH_PER_FRAME; i += 2) {
+    for (int i = 0; i < audio.size(); i += 2) {
         float l = audio[i];
         float r = audio[i + 1];
 

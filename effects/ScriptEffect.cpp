@@ -24,6 +24,7 @@
 #include <sstream>
 #include <csetjmp>
 #include <csignal>
+#include "../utils/debug.hpp"
 
 static void registerAllSymbols(TCCState* state) {
     struct { const char* name; void* addr; } syms[] = {
@@ -396,7 +397,7 @@ void ScriptEffect::setParams(ScriptParamsArray params) {
     spin_lock.clear(std::memory_order_release);
 }
 
-void ScriptEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
+void ScriptEffect::run(std::span<float> audio) {
     static_assert((bufferType() == BufferType::PLANAR), "ScriptEffect run with non-planar buffer type");
     
     if (!is_loaded.load(std::memory_order_acquire) 
@@ -420,9 +421,9 @@ void ScriptEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
 
     if (sigsetjmp(g_script_jmp_buf, 1) == 0) {
         func(audio.data(), 
-            audio.data() + SAMPLES_LENGTH_PER_CHANNEL, 
+            audio.data() + samples_per_channel, 
             audio.data(), 
-            audio.data() + SAMPLES_LENGTH_PER_CHANNEL);
+            audio.data() + samples_per_channel);
 
         spin_lock.clear(std::memory_order_release);
     } else {

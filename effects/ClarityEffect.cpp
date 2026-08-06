@@ -56,14 +56,14 @@ void ClarityEffect::copyParamsFrom(const ClarityEffect& other) {
     setEnabled(other.acquireReadEnabled());
 }
 
-void ClarityEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
+void ClarityEffect::run(std::span<float> audio) {
     static_assert((bufferType() == BufferType::INTERLEAVED), "ClarityEffect run with non-interleaved buffer type");
 
     float _gain = gain.load(std::memory_order_relaxed);
 
     if (std::fabs(_gain) < 0.00001f) return;
 
-    for (int i = 0; i < SAMPLES_LENGTH_PER_FRAME; i += 2) {
+    for (int i = 0; i < audio.size(); i += 2) {
         float prev_l = audio[i];
         float prev_r = audio[i + 1];
 

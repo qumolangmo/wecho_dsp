@@ -44,11 +44,11 @@ EvenHarmonicEffect::EvenHarmonicEffect(bool _enabled, float _base, float _warm, 
         band3[i].setBandPass(1400, 1600);
         band4[i].setBandPass(2600, 3000);
 
-        delay_band1[i].setDelay((max_delay - group_delay_band1) * SAMPLE_RATE);
-        delay_band2[i].setDelay((max_delay - group_delay_band2) * SAMPLE_RATE);
-        delay_band3[i].setDelay((max_delay - group_delay_band3) * SAMPLE_RATE);
-        delay_band4[i].setDelay((max_delay - group_delay_band4) * SAMPLE_RATE);
-        delay_other[i].setDelay((max_delay) * SAMPLE_RATE);
+        delay_band1[i].setDelay((max_delay - group_delay_band1) * sample_rate);
+        delay_band2[i].setDelay((max_delay - group_delay_band2) * sample_rate);
+        delay_band3[i].setDelay((max_delay - group_delay_band3) * sample_rate);
+        delay_band4[i].setDelay((max_delay - group_delay_band4) * sample_rate);
+        delay_other[i].setDelay((max_delay) * sample_rate);
     }
 
     reset();
@@ -110,7 +110,7 @@ void EvenHarmonicEffect::copyParamsFrom(const EvenHarmonicEffect& other) {
     setEnabled(other.acquireReadEnabled());
 }
 
-void EvenHarmonicEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
+void EvenHarmonicEffect::run(std::span<float> audio) {
     static_assert((bufferType() == BufferType::INTERLEAVED), "EvenHarmonicEffect run with non-interleaved buffer type");
 
     static float _gain = std::pow(10.0f, 12.0f / 20.0f);
@@ -145,7 +145,7 @@ void EvenHarmonicEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
 
     if (std::fabs(_gain) < 0.00001f) return;
 
-    for (int i = 0; i < SAMPLES_LENGTH_PER_FRAME; i += 2) {
+    for (int i = 0; i < audio.size(); i += 2) {
         int l_idx = i;
         int r_idx = i + 1;
 

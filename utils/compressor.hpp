@@ -22,15 +22,16 @@
 
 #include <cmath>
 #include <algorithm>
+#include "utils.h"
 
-class Compressor {
+class Compressor: public Utils {
 private:
     float threshold;
     float ratio;
     float attack_coeff;
     float release_coeff;
     float makeup_gain;
-    static constexpr int SAMPLE_RATE = 48000;
+    int sample_rate = getSampleRate();
 
     float envelope;
     float envelope_peak;
@@ -40,7 +41,8 @@ public:
     friend class CompressorEffect;
     
     Compressor()
-        : threshold(std::pow(10.0f, -18.0f / 20.f))
+        : Utils()
+        , threshold(std::pow(10.0f, -18.0f / 20.f))
         , ratio(8.0f)
         , attack_coeff(0.0f)
         , release_coeff(0.0f)
@@ -67,7 +69,7 @@ public:
 
     void setRelease(int release_ms) {
         if (release_ms > 0) {
-            release_coeff = std::exp(-1.0f / (release_ms * 0.001f * SAMPLE_RATE));
+            release_coeff = std::exp(-1.0f / (release_ms * 0.001f * sample_rate));
             release_coeff = std::min(release_coeff, 1.0f);
         } else {
             release_coeff = 0.0f;
@@ -76,7 +78,7 @@ public:
 
     void setAttack(int attack_ms) {
         if (attack_ms > 0) {
-            attack_coeff = 1.0f - std::exp(-1.0f / (attack_ms * 0.001f * SAMPLE_RATE));
+            attack_coeff = 1.0f - std::exp(-1.0f / (attack_ms * 0.001f * sample_rate));
             attack_coeff = std::min(attack_coeff, 1.0f);
         } else {
             attack_coeff = 0.0f;

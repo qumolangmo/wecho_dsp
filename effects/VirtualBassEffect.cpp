@@ -33,8 +33,8 @@ VirtualBassEffect::VirtualBassEffect(bool enabled)
     high_gain.store(0.16f, std::memory_order_release);
     harmonic_gain.store(1.00f, std::memory_order_release);
 
-    envelope_alpha = 2.0f * M_PI * 25.0f / SAMPLE_RATE;
-    lp_soft_alpha = 2.0f * M_PI * 50.0f / SAMPLE_RATE;
+    envelope_alpha = 2.0f * M_PI * 25.0f / sample_rate;
+    lp_soft_alpha = 2.0f * M_PI * 50.0f / sample_rate;
 
     post_gain = std::pow(10.0f, 12.0f / 20.0f);
 
@@ -98,7 +98,7 @@ void VirtualBassEffect::reset() {
 
 void VirtualBassEffect::setEnvelopeRate(float envelope_rate) {
     this->envelope_rate.store(envelope_rate, std::memory_order_release);
-    this->lp_soft_alpha.store(2.0f * M_PI * envelope_rate / SAMPLE_RATE, std::memory_order_release);
+    this->lp_soft_alpha.store(2.0f * M_PI * envelope_rate / sample_rate, std::memory_order_release);
 }
 
 void VirtualBassEffect::setMidGain(float mid_gain) {
@@ -113,7 +113,7 @@ void VirtualBassEffect::setHarmonicGain(float harmonic_gain) {
     this->harmonic_gain.store(harmonic_gain, std::memory_order_release);
 }
 
-void VirtualBassEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
+void VirtualBassEffect::run(std::span<float> audio) {
     static_assert((bufferType() == BufferType::INTERLEAVED), "VirtualBassEffect run with non-interleaved buffer type");
     
     float lp_soft_alpha = this->lp_soft_alpha.load(std::memory_order_relaxed);
@@ -121,7 +121,7 @@ void VirtualBassEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
     float high_gain = this->high_gain.load(std::memory_order_relaxed);
     float harmonic_gain = this->harmonic_gain.load(std::memory_order_relaxed);
 
-    for (int i = 0; i < SAMPLES_LENGTH_PER_FRAME; i += 2) {
+    for (int i = 0; i < audio.size(); i += 2) {
         float hp_l = audio[i];
         float hp_r = audio[i + 1];
         float bp_l = audio[i];

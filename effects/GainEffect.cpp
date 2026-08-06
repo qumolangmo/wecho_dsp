@@ -46,14 +46,14 @@ void GainEffect::setGain(float gain) {
     this->gain.store(std::pow(10.0f, gain / 20.0f), std::memory_order_release);
 }
 
-void GainEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
+void GainEffect::run(std::span<float> audio) {
     static_assert((bufferType() == BufferType::INTERLEAVED), "GainEffect run with non-interleaved buffer type");
 
     float _gain = gain.load(std::memory_order_relaxed);
 
     if (std::fabs(_gain) < 0.0001f) return;
 
-    for (int i = 0; i < SAMPLES_LENGTH_PER_FRAME; i += 2) {
+    for (int i = 0; i < audio.size(); i += 2) {
         audio[i] *= _gain;
         audio[i + 1] *= _gain;
     }

@@ -22,10 +22,10 @@
 
 #include <deque>
 #include "filter.hpp"
-#include "debug.hpp"
+#include "utils.h"
 
 template<int size>
-class SlidingWindow {
+class SlidingWindow: Utils {
 private:
     std::deque<float> dq;
     std::array<float, size> buffer;
@@ -76,7 +76,7 @@ enum BandType {
 };
 
 template<BandType type>
-class LookaheadLimiter {
+class LookaheadLimiter: public Utils {
 private:
     static constexpr int DELAY_SIZE = 256;
     float attack_smooth = 0.1f;

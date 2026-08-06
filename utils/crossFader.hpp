@@ -23,6 +23,7 @@
 #include <utility>
 #include <functional>
 #include "../enum.h"
+#include "utils.h"
 
 /* If you want to apply the CrossFader in yourself effect,
  *
@@ -34,7 +35,7 @@
  *
  */
 template <typename T>
-concept EffectInstance = requires(T t, const T& other, std::span<float, 1024> audio) {
+concept EffectInstance = requires(T t, const T& other, std::span<float> audio) {
     {t.copyParamsFrom(other)};
     {t.reset()};
     {t.run(audio)};
@@ -43,11 +44,11 @@ concept EffectInstance = requires(T t, const T& other, std::span<float, 1024> au
 };
 
 template <EffectInstance T>
-class CrossFader {
+class CrossFader: public Utils {
 private:
-    static constexpr int SAMPLE_RATE = 48000;
-    static constexpr int SAMPLES_LENGTH_PER_FRAME = 1024;
-    static constexpr int SAMPLES_LENGTH_PER_CHANNEL = SAMPLES_LENGTH_PER_FRAME / 2;
+    int sample_rate = getSampleRate();
+    int samples_per_frame = getSamplesPerChannel() * getChannels();
+    int samples_per_channel = getSamplesPerChannel();
 
     T cache1, cache2;
     T* current;
@@ -58,22 +59,24 @@ private:
     std::atomic<bool> is_fade_in;
     std::atomic<bool> is_fade_out;
 
-    std::array<float, SAMPLES_LENGTH_PER_FRAME> current_audio, target_audio;
+    std::vector<float> current_audio, target_audio;
     std::function<void(T&)> next;
 public:
     template<typename... Args>
     CrossFader(int fade_time_ms, Args&&... args)
-        : fade_samples(static_cast<int>(fade_time_ms * SAMPLE_RATE / 1000)),
+        : fade_samples(static_cast<int>(fade_time_ms * sample_rate / 1000)),
           fade_counter(0),
           cache1(std::forward<Args>(args)...),
           cache2(std::forward<Args>(args)...),
+          current_audio(samples_per_frame),
+          target_audio(samples_per_frame),
           current(&cache1),
           target(&cache2),
           is_cross_fading(false),
           is_fade_in(false),
           is_fade_out(false) {}
 
-    void run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
+    void run(std::span<float> audio) {
         bool _is_cross_fading = is_cross_fading.load(std::memory_order_acquire);
         bool _is_fade_in = is_fade_in.load(std::memory_order_acquire);
         bool _is_fade_out = is_fade_out.load(std::memory_order_acquire);
@@ -88,7 +91,7 @@ public:
             float t;
 
             if (current->bufferType() == BufferType::INTERLEAVED) {
-                for (int i = 0; i < SAMPLES_LENGTH_PER_FRAME; i += 2) {
+                for (int i = 0; i < samples_per_frame; i += 2) {
                     t = static_cast<float>(fade_counter) / fade_samples;
                     int l_idx = i;
                     int r_idx = i + 1;
@@ -99,10 +102,10 @@ public:
                     fade_counter++;
                 }
             } else {
-                for (int i = 0; i < SAMPLES_LENGTH_PER_CHANNEL; i++) {
+                for (int i = 0; i < samples_per_channel; i++) {
                     t = static_cast<float>(fade_counter) / fade_samples;
                     int l_idx = i;
-                    int r_idx = i + SAMPLES_LENGTH_PER_CHANNEL;
+                    int r_idx = i + samples_per_channel;
 
                     audio[l_idx] = current_audio[l_idx] * (1.0 - t) + target_audio[l_idx] * t;
                     audio[r_idx] = current_audio[r_idx] * (1.0 - t) + target_audio[r_idx] * t;
@@ -130,7 +133,7 @@ public:
             float t;
 
             if (current->bufferType() == BufferType::INTERLEAVED) {
-                for (int i = 0; i < SAMPLES_LENGTH_PER_FRAME; i += 2) {
+                for (int i = 0; i < samples_per_frame; i += 2) {
                     t = static_cast<float>(fade_counter) / fade_samples;
                     int l_idx = i;
                     int r_idx = i + 1;
@@ -146,10 +149,10 @@ public:
                 }
 
             } else {
-                for (int i = 0; i < SAMPLES_LENGTH_PER_CHANNEL; i++) {
+                for (int i = 0; i < samples_per_channel; i++) {
                     t = static_cast<float>(fade_counter) / fade_samples;
                     int l_idx = i;
-                    int r_idx = i + SAMPLES_LENGTH_PER_CHANNEL;
+                    int r_idx = i + samples_per_channel;
 
                     if (_is_fade_in) {
                         audio[l_idx] = audio[l_idx] * (1.0 - t) + current_audio[l_idx] * t;

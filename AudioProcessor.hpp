@@ -49,9 +49,6 @@ public:
 
 class AudioProcessor {
 private:
-    static constexpr int FRAME_SIZE_PER_CHANNEL = 512;
-    static constexpr int SAMPLE_RATE = 48000;
-
     CrossFader<BassEffect> EBass;
     CrossFader<ClarityEffect> EClarity;
     GainEffect EGain;
@@ -73,7 +70,7 @@ private:
 
 private:
     AudioProcessor()
-        : audio_stream(FRAME_SIZE_PER_CHANNEL * 3)
+        : audio_stream()
         , EBass(50.0, false, 0, 1.48f, 60.0f)
         , EClarity(50.0, false, 0)
         , EGain(false, 0)
@@ -353,9 +350,12 @@ public:
         return instance;
     }
 
-    static void init(std::string_view files_dir) {
+    static void init(std::string_view files_dir, int sample_rate, int samples_per_channel, int channels) {
         // FFTWFPlan::initWisdom(std::string(files_dir) + "/fftw_wisdom");
         ScriptEffect::setCacheDir(files_dir);
+        Utils::setChannels(channels);
+        Utils::setSampleRate(sample_rate);
+        Utils::setSamplesPerChannel(samples_per_channel);
     }
 
     // TODO: check out KFR/DSP

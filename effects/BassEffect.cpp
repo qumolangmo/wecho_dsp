@@ -80,14 +80,14 @@ void BassEffect::copyParamsFrom(const BassEffect& other) {
     setEnabled(other.acquireReadEnabled());
 }
 
-void BassEffect::run(std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
+void BassEffect::run(std::span<float> audio) {
     static_assert((bufferType() == BufferType::INTERLEAVED), "BassEffect run with non-interleaved buffer type");
 
     float _gain = gain.load(std::memory_order_relaxed);
 
     if (std::fabs(_gain) < 0.00001f) return;
 
-    for (int i = 0; i < SAMPLES_LENGTH_PER_FRAME; i += 2) {
+    for (int i = 0; i < audio.size(); i += 2) {
         int l_idx = i;
         int r_idx = i + 1;
 

@@ -23,6 +23,7 @@
 #include <cmath>
 #include <array>
 #include "../enum.h"
+#include "utils.h"
 
 #ifndef M_PI
 #define M_PI 3.141592653589793
@@ -37,7 +38,7 @@ inline double omega(float fc, int sample_rate) {
 }
 
 template<int MaxDelay>
-class DelayLine {
+class DelayLine: public Utils {
 private:
     std::array<float, MaxDelay> buffer;
     alignas(64) struct {
@@ -105,9 +106,9 @@ public:
     }
 };
 
-class _Biquad {
+class _Biquad: public Utils {
 private:
-    static constexpr int SAMPLE_RATE = 48000;
+    int sample_rate = getSampleRate();
     double x1, x2, y1, y2;
     double a1, a2, b0, b1, b2;
 
@@ -132,7 +133,7 @@ public:
     }
 
     void setLowPass(float freq, float Q) {
-        double _omega = omega(freq, SAMPLE_RATE);
+        double _omega = omega(freq, sample_rate);
         double sin_omega = std::sin(_omega);
         double cos_omega = std::cos(_omega);
 
@@ -149,7 +150,7 @@ public:
     }
 
     void setHighPass(float freq, float Q) {
-        double _omega = omega(freq, SAMPLE_RATE);
+        double _omega = omega(freq, sample_rate);
         double sin_omega = std::sin(_omega);
         double cos_omega = std::cos(_omega);
 
@@ -166,7 +167,7 @@ public:
     }
 
     void setPeak(float freq, float Q, float gain) {
-        double _omega = omega(freq, SAMPLE_RATE);
+        double _omega = omega(freq, sample_rate);
         double sin_omega = std::sin(_omega);
         double cos_omega = std::cos(_omega);
 
@@ -184,8 +185,8 @@ public:
     }
 
     void setLowShelf(float freq, float Q, float gain) {
-        double _omega_half = omegaHalf(freq, SAMPLE_RATE);
-        double _omega = omega(freq, SAMPLE_RATE);
+        double _omega_half = omegaHalf(freq, sample_rate);
+        double _omega = omega(freq, sample_rate);
 
         double cos_omega = std::cos(_omega);
         double alpha = std::sin(_omega) / (2.0 * Q);
@@ -207,8 +208,8 @@ public:
     }
 
     void setHighShelf(float freq, float Q, float gain) {
-        double _omega_half = omegaHalf(freq, SAMPLE_RATE);
-        double _omega = omega(freq, SAMPLE_RATE);
+        double _omega_half = omegaHalf(freq, sample_rate);
+        double _omega = omega(freq, sample_rate);
 
         double cos_omega = std::cos(_omega);
         double alpha = std::sin(_omega) / (2.0 * Q);
@@ -230,7 +231,7 @@ public:
     }
 
     void setAllPass(float freq, float Q) {
-        double _omega = omega(freq, SAMPLE_RATE);
+        double _omega = omega(freq, sample_rate);
         double sin_omega = std::sin(_omega);
         double cos_omega = std::cos(_omega);
 

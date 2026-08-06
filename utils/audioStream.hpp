@@ -19,28 +19,31 @@
 
 #ifndef __AUDIO_STREAM_H__
 #define __AUDIO_STREAM_H__
-#include "../effects/effect.hpp"
+
 #include "../utils/crossFader.hpp"
+#include "utils.h"
 
 template<typename T>
-concept HasBufferType = requires(T& t, std::span<float, SAMPLES_LENGTH_PER_FRAME> audio) {
+concept HasBufferType = requires(T& t, std::span<float> audio) {
     {T::bufferType()};
     {t.isEnabled()};
     {t.run(audio)};
 };
 
-class AudioStream {
+class AudioStream: public Utils {
 private:
-    static const int SAMPLES_LENGTH_PER_FRAME = 1024;
-    static const int SAMPLES_LENGTH_PER_CHANNEL = SAMPLES_LENGTH_PER_FRAME / 2;
+    int samples_per_frame = getSamplesPerChannel() * getChannels();
+    int samples_per_channel = getSamplesPerChannel();
 
-    std::array<float, SAMPLES_LENGTH_PER_FRAME> audio, temp;
+    std::vector<float> audio, temp;
 
     BufferType current_buffer_type;
 
 public:
-    AudioStream(size_t buffer_size)
-        : current_buffer_type(BufferType::INTERLEAVED) {}
+    AudioStream()
+        : current_buffer_type(BufferType::INTERLEAVED)
+        , audio(samples_per_frame)
+        , temp(samples_per_frame) {}
     
     template<typename T>
     AudioStream& operator>>(T& next) {
@@ -57,22 +60,22 @@ public:
 
     void operator>>(float *output) {
         if (current_buffer_type == BufferType::INTERLEAVED) {
-            memcpy(output, audio.data(), sizeof(float) * SAMPLES_LENGTH_PER_FRAME);
+            memcpy(output, audio.data(), sizeof(float) * samples_per_frame);
         } else {
-            for (int i = 0; i < SAMPLES_LENGTH_PER_CHANNEL; i++) {
+            for (int i = 0; i < samples_per_channel; i++) {
                 output[i * 2] = audio[i];
-                output[i * 2 + 1] = audio[i + SAMPLES_LENGTH_PER_CHANNEL];
+                output[i * 2 + 1] = audio[i + samples_per_channel];
             }
         }
     }
 
     void operator<<(float *input) {
         if (current_buffer_type == BufferType::INTERLEAVED) {
-            memcpy(audio.data(), input, sizeof(float) * SAMPLES_LENGTH_PER_FRAME);
+            memcpy(audio.data(), input, sizeof(float) * samples_per_frame);
         } else {
-            for (int i = 0; i < SAMPLES_LENGTH_PER_CHANNEL; i++) {
+            for (int i = 0; i < samples_per_channel; i++) {
                 audio[i] = input[i * 2] * 0.8f;
-                audio[i + SAMPLES_LENGTH_PER_CHANNEL] = input[i * 2 + 1] * 0.8f;
+                audio[i + samples_per_channel] = input[i * 2 + 1] * 0.8f;
             }
         }
     }
@@ -103,16 +106,16 @@ public:
         if (current_buffer_type != BufferType::INTERLEAVED) {
             current_buffer_type = BufferType::INTERLEAVED;
 
-            for (int i = 0; i < SAMPLES_LENGTH_PER_CHANNEL; i++) {
+            for (int i = 0; i < samples_per_channel; i++) {
                 audio[i * 2] = temp[i];
-                audio[i * 2 + 1] = temp[i + SAMPLES_LENGTH_PER_CHANNEL];
+                audio[i * 2 + 1] = temp[i + samples_per_channel];
             }
         } else {
             current_buffer_type = BufferType::PLANAR;
 
-            for (int i = 0; i < SAMPLES_LENGTH_PER_CHANNEL; i++) {
+            for (int i = 0; i < samples_per_channel; i++) {
                 audio[i] = temp[i * 2];
-                audio[i + SAMPLES_LENGTH_PER_CHANNEL] = temp[i * 2 + 1];
+                audio[i + samples_per_channel] = temp[i * 2 + 1];
             }
         }
     }
