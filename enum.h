@@ -38,63 +38,7 @@ struct Coeffs {
 };
 
 using IIREqualizerCoeffs = std::array<Coeffs, 10>;
-
 using ScriptParamsArray = ScriptParams[16];
-
-#define EFFECT_PARAMS \
-    X(GAIN_EFFECT_GAIN, float) \
-    X(BALANCE_EFFECT_BALANCE, float) \
-    X(BASS_EFFECT_ENABLED, bool) \
-    X(BASS_EFFECT_GAIN, int) \
-    X(BASS_EFFECT_CENTER_FREQ, int) \
-    X(BASS_EFFECT_Q, float) \
-    X(CLARITY_EFFECT_ENABLED, bool) \
-    X(CLARITY_EFFECT_GAIN, int) \
-    X(EVEN_HARMONIC_EFFECT_ENABLED, bool) \
-    X(EVEN_HARMONIC_EFFECT_BASE, float) \
-    X(EVEN_HARMONIC_EFFECT_WARM, float) \
-    X(EVEN_HARMONIC_EFFECT_SUGAR, float) \
-    X(CONVOLVE_EFFECT_ENABLED, bool) \
-    X(CONVOLVE_EFFECT_MIX, float) \
-    X(CONVOLVE_EFFECT_IR_PATH, FileName) \
-    X(CONVOLVE_EFFECT_IR_DATA, FloatArray) \
-    X(COMPRESSOR_EFFECT_ENABLED, bool) \
-    X(COMPRESSOR_EFFECT_THRESHOLD, int) \
-    X(COMPRESSOR_EFFECT_RATIO, int) \
-    X(COMPRESSOR_EFFECT_MAKEUP_GAIN, int) \
-    X(COMPRESSOR_EFFECT_ATTACK, int) \
-    X(COMPRESSOR_EFFECT_RELEASE, int) \
-    X(LOOK_AHEAD_SOFT_LIMIT_EFFECT_ENABLED, bool) \
-    X(LOW_CAT_EFFECT_ENABLED, bool) \
-    X(LOW_CAT_EFFECT_CUTOFF_FREQ, int) \
-    X(IIR_EQUALIZER_EFFECT_ENABLED, bool) \
-    X(IIR_EQUALIZER_EFFECT_COEFFS, IIREqualizerCoeffs) \
-    X(VIRTUALBASS_EFFECT_ENABLED, bool) \
-    X(VIRTUALBASS_EFFECT_ENVELOPE_RATE, int) \
-    X(VIRTUALBASS_EFFECT_MID_GAIN, float) \
-    X(VIRTUALBASS_EFFECT_HIGH_GAIN, float) \
-    X(VIRTUALBASS_EFFECT_HARMONIC_GAIN, float) \
-    X(REVERB_EFFECT_ENABLED, bool) \
-    X(REVERB_EFFECT_ROOM_SIZE, float) \
-    X(REVERB_EFFECT_DAMPING, float) \
-    X(REVERB_EFFECT_MIX, float) \
-    X(REVERB_EFFECT_STEREO_WIDTH, float) \
-    X(REVERB_EFFECT_MOD_DEPTH, float) \
-    X(REVERB_EFFECT_MOD_FREQ, float) \
-    X(REVERB_EFFECT_PRE_DELAY, int) \
-    X(REVERB_EFFECT_MATRIX_TYPE, int) \
-    X(SCRIPT_EFFECT_ENABLED, bool) \
-    X(SCRIPT_EFFECT_PARAMS, ScriptParamsArray) \
-    X(SCRIPT_EFFECT_CODE, ScriptCode) \
-    X(DIFF_SURROUNDING_EFFECT_ENABLED, bool) \
-    X(DIFF_SURROUNDING_EFFECT_DELAY_MS, int) \
-    X(MAX_EFFECT_PARAM, int)
-
-enum ParamID {
-#define X(name, type) name,
-    EFFECT_PARAMS
-#undef X
-};
 
 enum ParamType {
     PARAM_TYPE_BOOL,
@@ -102,34 +46,63 @@ enum ParamType {
     PARAM_TYPE_FLOAT,
     PARAM_TYPE_STRING,
     PARAM_TYPE_ARRAY,
+    PARAM_TYPE_SCRIPT_PARAMS,
 };
 
-struct alignas(4) EffectData {
-#define X(name, type) type name;
+#define EFFECT_PARAMS \
+    X(MASTER_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
+    X(GAIN_EFFECT_GAIN, float, PARAM_TYPE_FLOAT) \
+    X(BALANCE_EFFECT_BALANCE, float, PARAM_TYPE_FLOAT) \
+    X(BASS_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
+    X(BASS_EFFECT_GAIN, int, PARAM_TYPE_INT) \
+    X(BASS_EFFECT_CENTER_FREQ, int, PARAM_TYPE_INT) \
+    X(BASS_EFFECT_Q, float, PARAM_TYPE_FLOAT) \
+    X(CLARITY_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
+    X(CLARITY_EFFECT_GAIN, int, PARAM_TYPE_INT) \
+    X(EVEN_HARMONIC_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
+    X(EVEN_HARMONIC_EFFECT_BASE, float, PARAM_TYPE_FLOAT) \
+    X(EVEN_HARMONIC_EFFECT_WARM, float, PARAM_TYPE_FLOAT) \
+    X(EVEN_HARMONIC_EFFECT_SUGAR, float, PARAM_TYPE_FLOAT) \
+    X(CONVOLVE_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
+    X(CONVOLVE_EFFECT_MIX, float, PARAM_TYPE_FLOAT) \
+    X(CONVOLVE_EFFECT_IR_PATH, FileName, PARAM_TYPE_STRING) \
+    X(CONVOLVE_EFFECT_IR_DATA, FloatArray, PARAM_TYPE_ARRAY) \
+    X(COMPRESSOR_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
+    X(COMPRESSOR_EFFECT_THRESHOLD, int, PARAM_TYPE_INT) \
+    X(COMPRESSOR_EFFECT_RATIO, int, PARAM_TYPE_INT) \
+    X(COMPRESSOR_EFFECT_MAKEUP_GAIN, int, PARAM_TYPE_INT) \
+    X(COMPRESSOR_EFFECT_ATTACK, int, PARAM_TYPE_INT) \
+    X(COMPRESSOR_EFFECT_RELEASE, int, PARAM_TYPE_INT) \
+    X(LOOK_AHEAD_SOFT_LIMIT_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
+    X(LOW_CAT_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
+    X(LOW_CAT_EFFECT_CUTOFF_FREQ, int, PARAM_TYPE_INT) \
+    X(IIR_EQUALIZER_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
+    X(IIR_EQUALIZER_EFFECT_COEFFS, IIREqualizerCoeffs, PARAM_TYPE_ARRAY) \
+    X(VIRTUALBASS_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
+    X(VIRTUALBASS_EFFECT_ENVELOPE_RATE, int, PARAM_TYPE_INT) \
+    X(VIRTUALBASS_EFFECT_MID_GAIN, float, PARAM_TYPE_FLOAT) \
+    X(VIRTUALBASS_EFFECT_HIGH_GAIN, float, PARAM_TYPE_FLOAT) \
+    X(VIRTUALBASS_EFFECT_HARMONIC_GAIN, float, PARAM_TYPE_FLOAT) \
+    X(REVERB_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
+    X(REVERB_EFFECT_ROOM_SIZE, float, PARAM_TYPE_FLOAT) \
+    X(REVERB_EFFECT_DAMPING, float, PARAM_TYPE_FLOAT) \
+    X(REVERB_EFFECT_MIX, float, PARAM_TYPE_FLOAT) \
+    X(REVERB_EFFECT_STEREO_WIDTH, float, PARAM_TYPE_FLOAT) \
+    X(REVERB_EFFECT_MOD_DEPTH, float, PARAM_TYPE_FLOAT) \
+    X(REVERB_EFFECT_MOD_FREQ, float, PARAM_TYPE_FLOAT) \
+    X(REVERB_EFFECT_PRE_DELAY, int, PARAM_TYPE_INT) \
+    X(REVERB_EFFECT_MATRIX_TYPE, int, PARAM_TYPE_INT) \
+    X(SCRIPT_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
+    X(SCRIPT_EFFECT_PARAMS, ScriptParamsArray, PARAM_TYPE_SCRIPT_PARAMS) \
+    X(SCRIPT_EFFECT_CODE, ScriptCode, PARAM_TYPE_STRING) \
+    X(DIFF_SURROUNDING_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
+    X(DIFF_SURROUNDING_EFFECT_DELAY_MS, int, PARAM_TYPE_INT) \
+    X(MAX_EFFECT_PARAM, int, PARAM_TYPE_INT)
+
+enum ParamID {
+#define X(name, type, enum_type) name,
     EFFECT_PARAMS
 #undef X
-};
-
-struct alignas(8) SharedData {
-    /* 
-     * true: owner apo
-     * false: owner ui
-     */
-    std::atomic<bool> flags = false;
-    static_assert(sizeof(std::atomic<bool>) == sizeof(bool), "std::atomic<bool> must be the same size as bool");
-    static_assert(sizeof(bool) == 1, "bool must be 1 byte");
-
-    /* only apo update this field */
-    std::atomic<uint64_t> last_heart_beat = 0;
-    static_assert(sizeof(std::atomic<uint64_t>) == sizeof(uint64_t), "std::atomic<uint64_t> must be the same size as uint64_t");
-    static_assert(sizeof(uint64_t) == 8, "uint64_t must be 8 bytes");
-
-    std::atomic<bool> enabled_apo = false;
-    std::atomic<int> ir_length = 0;
-    static_assert(sizeof(std::atomic<int>) == sizeof(int), "std::atomic<int> must be the same size as int");
-    static_assert(sizeof(int) == 4, "int must be 4 bytes");
-
-    EffectData effect_data;
 };
 
 enum Priority {

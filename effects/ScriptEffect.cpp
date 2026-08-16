@@ -19,11 +19,12 @@
 
 #include "effect.hpp"
 #include "../scripting/wecho_dsp_c_api.h"
-#include <dlfcn.h>
 #include <fstream>
 #include <sstream>
+#ifdef __ANDROID__
 #include <csetjmp>
 #include <csignal>
+#endif
 #include "../utils/debug.hpp"
 
 static void registerAllSymbols(TCCState* state) {
@@ -94,17 +95,21 @@ static void registerAllSymbols(TCCState* state) {
 
 std::string ScriptEffect::last_error;
 static std::string g_cache_dir;
+static volatile bool g_script_crashed = false;
 
+#ifdef __ANDROID__
 /* crash recovery variables */
 static sigjmp_buf g_script_jmp_buf;
-static volatile bool g_script_crashed = false;
 static struct sigaction g_old_sigsegv_handler;
 static struct sigaction g_old_sigbus_handler;
 static struct sigaction sa;
+#endif
 
 static void script_crash_handler(int sig) {
     g_script_crashed = true;
+#ifdef __ANDROID__
     siglongjmp(g_script_jmp_buf, 1);
+#endif
 }
 
 bool ScriptEffect::consumeCrashFlag() {
@@ -146,15 +151,15 @@ static std::string readFile(const char* path) {
 }
 
 static void ensureTccAssetsAvailable() {
-    if (!g_libtcc1_path.empty()) {
+    std::string cacheDir = g_cache_dir;
+
+    if (cacheDir.empty()) {
         return;
     }
 
-    std::string cacheDir = g_cache_dir;
-
-    g_libtcc1_path = std::string(cacheDir) + "/libtcc1.a";
-    g_tcclib_h = readFile((std::string(cacheDir) + "/tcclib.h").c_str());
-    g_wecho_dsp_c_api_h = readFile((std::string(cacheDir) + "/wecho_dsp_c_api.h").c_str());
+    g_libtcc1_path = cacheDir + "/libtcc1.a";
+    g_tcclib_h = readFile((cacheDir + "/tcclib.h").c_str());
+    g_wecho_dsp_c_api_h = readFile((cacheDir + "/wecho_dsp_c_api.h").c_str());
 }
 
 static std::string cleanCode(const std::string& code) {
@@ -178,6 +183,13 @@ static std::string prependHeaders(const std::string& userCode) {
     result.reserve(g_tcclib_h.size() + g_wecho_dsp_c_api_h.size() + cleaned.size() + 64);
     result += g_tcclib_h;
     result += g_wecho_dsp_c_api_h;
+
+    result += "\n#define SAMPLE_RATE ";
+    result += std::to_string(Utils::getSampleRate());
+    result += "\n#define SAMPLES_PER_CHANNEL ";
+    result += std::to_string(Utils::getSamplesPerChannel());
+    result += "\n";
+
     result += "\n#line 1 \"user_script.c\"\n";
     result += cleaned;
     return result;
@@ -191,9 +203,11 @@ ScriptEffect::ScriptEffect(bool enabled)
     , process_func(nullptr)
     , params_func(nullptr) {
 
+#ifdef __ANDROID__
     sa.sa_handler = script_crash_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
+#endif
 }
 
 inline void ScriptEffect::errorHandle(void* op, const char* error_msg) {
@@ -296,9 +310,10 @@ void ScriptEffect::setCode(std::string code) {
     tcc_add_include_path(new_state, (cacheDir + "/include").c_str());
     tcc_set_lib_path(new_state, cacheDir.c_str());
     tcc_set_options(new_state, "-std=c99 -nostdlib -DTCC_MATH");
+#ifdef __ANDROID__
     tcc_add_library_path(new_state, "/system/lib64");
     tcc_add_library(new_state, "dl");
-
+#endif
     std::string fullCode = prependHeaders(code);
 
     if (tcc_compile_string(new_state, fullCode.c_str()) == -1) {
@@ -327,6 +342,9 @@ void ScriptEffect::setCode(std::string code) {
 
     auto new_process_func = (void (*)(float*, float*, float*, float*))run_handle;
     auto new_params_func = (void (*)(ScriptParams*))params_handle;
+
+    LOG_D("ScriptEffect: compiled ok, sample_rate=%d samples_per_channel=%d",
+          Utils::getSampleRate(), Utils::getSamplesPerChannel());
 
     while (spin_lock.test_and_set(std::memory_order_acquire));
 
@@ -413,13 +431,18 @@ void ScriptEffect::run(std::span<float> audio) {
         spin_lock.clear(std::memory_order_release);
         return;
     }
-
+#ifdef __ANDROID__
     sigaction(SIGSEGV, &sa, &g_old_sigsegv_handler);
     sigaction(SIGBUS, &sa, &g_old_sigbus_handler);
+#endif
 
     g_script_crashed = false;
 
+#ifdef __ANDROID__
     if (sigsetjmp(g_script_jmp_buf, 1) == 0) {
+#else
+    if (true) {
+#endif
         func(audio.data(), 
             audio.data() + samples_per_channel, 
             audio.data(), 
@@ -437,9 +460,11 @@ void ScriptEffect::run(std::span<float> audio) {
         "Please change current dsp code to another one (to avoid the next restart crash), and restart wecho.";
     }
 
+#ifdef __ANDROID__
     /* restore original handlers */
     sigaction(SIGSEGV, &g_old_sigsegv_handler, nullptr);
     sigaction(SIGBUS, &g_old_sigbus_handler, nullptr);
+#endif
 }
 
 void ScriptEffect::copyParamsFrom(const ScriptEffect& other) {

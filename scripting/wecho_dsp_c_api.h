@@ -111,16 +111,8 @@ float _math_fmax(float x, float y);
 #define fminf    _math_fmin
 #define fmaxf    _math_fmax
 
-#define SAMPLE_RATE 48000
-#define SAMPLES_PER_CHANNEL 512
 #define PARAM(name, min, max, step, value, display_name) float name = value;
 #endif
-
-
-/*
- * all utils working @48000hz
- * block processing size: 512 samples (an audio frame, captured from AudioRecord)
- */
 
 struct scriptParams {
     char name[64];

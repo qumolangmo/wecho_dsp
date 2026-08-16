@@ -27,6 +27,10 @@
 #include <cmath>
 #include "../utils/utils.h"
 
+#ifdef _WIN32
+#define __builtin_expect(expr, expected) (expr)
+#endif
+
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
