@@ -22,8 +22,11 @@
 #include <algorithm>
 #include <cmath>
 #include <array>
+#include <complex>
+#include <algorithm>
 #include "../enum.h"
 #include "utils.h"
+
 
 #ifndef M_PI
 #define M_PI 3.141592653589793
@@ -247,6 +250,39 @@ public:
         setCoeffs(a0, a1, a2, b0, b1, b2);
     }
 
+    void setNotch(float freq, float Q) {
+        double _omega = omega(freq, sample_rate);
+        double sin_omega = std::sin(_omega);
+        double cos_omega = std::sin(_omega);
+
+        double alpha = sin_omega / (2.0 * Q);
+
+        double a0 = 1.0 + alpha;
+        double a1 = -2.0 * cos_omega;
+        double a2 = 1.0 - alpha;
+        double b0 = 1.0;
+        double b1 = -2.0 * cos_omega;
+        double b2 = 1.0 - alpha;
+
+        setCoeffs(a0, a1, a2, b0, b1, b2);
+    }
+
+    void setPoleZero(std::complex<float>& p0, std::complex<float>& p1, std::complex<float>& z0, std::complex<float>& z1, float gain) {
+        auto sum_p = p0 + p1;
+        auto product_p = p0 * p1;
+        auto sum_z = z0 + z1;
+        auto product_z = z0 * z1;
+
+        double a0 = 1.0;
+        double a1 = -sum_p.real();
+        double a2 = product_p.real();
+        double b0 = gain;
+        double b1 = -gain * sum_z.real();
+        double b2 = gain * product_z.real();
+
+        setCoeffs(a0, a1, a2, b0, b1, b2);
+    }
+
     void reset() {
         x1 = x2 = y1 = y2 = 0;
     }
@@ -314,6 +350,57 @@ public:
     void setAllPass(const std::array<std::array<float, 2>, num>& coeffs) {
         for (int i = 0; i < num; i++) {
             biquads[i].setAllPass(coeffs[i][0], coeffs[i][1]);
+        }
+    }
+
+    /* coeffs: {freq1, Q1}, {freq2, Q2}, ... */
+    void setNotch(const std::array<std::array<float, 2>, num>& coeffs) {
+        for (int i = 0; i < num; i++) {
+            biquads[i].setNotch(coeffs[i][0], coeffs[i][1]);
+        }
+    }
+
+    /* this function will sort the poles and zeros. */
+    void setPoleZero(std::array<std::complex<float>, 2 * num>& poles, std::array<std::complex<float>, 2 * num>& zeros, float gain) {
+        auto clean = [](std::complex<float>& z) {
+            if (z.imag() != 0.0f && std::abs(z.imag()) < 1e-7f) {
+                z.imag(0.0f);
+            }
+        };
+
+        auto angle_sort = [](const std::complex<float>& a, const std::complex<float>& b) {
+            return std::arg(a) < std::arg(b);
+        };
+
+        auto normalized_factor = [&]() -> float {
+            std::complex<float> z_eval = 1.0f;
+            std::complex<float> number = 1.0f, den = 1.0f;
+
+            for (int i = 0; i < num; i++) {
+                number *= (1.0f - zeros[i] * z_eval);
+                den *= (1.0f - poles[i] * z_eval);
+            }
+
+            return (number / den).real();
+        };
+
+        for (int i = 0; i < poles.size(); i++) {
+            clean(poles[i]);
+            clean(zeros[i]);
+        }
+
+        std::sort(poles.begin(), poles.end(), angle_sort);
+        std::sort(zeros.begin(), zeros.end(), angle_sort);
+
+        float total_gain = gain * normalized_factor();
+
+        for (int i = 0; i < num; i++) {
+            auto& p0 = poles[2 * i];
+            auto& p1 = poles[2 * i + 1];
+            auto& z0 = poles[2 * i];
+            auto& z1 = poles[2 * i + 1];
+            float section_gain = (i == 0) ? total_gain : 1.0f;
+            biquads[i].setPoleZero(p0, p1, z0, z1, section_gain);
         }
     }
 
