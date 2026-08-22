@@ -198,12 +198,9 @@ public:
         , forward_plan(fft_size, FFTW_FORWARD, compute_cache_left, compute_cache_right, FFTW_ESTIMATE)
         , backward_plan(fft_size, FFTW_BACKWARD, compute_cache_right, compute_cache_left, FFTW_ESTIMATE)
         , cache(fft_size)
-        , acc_left(fft_size)
-        , acc_right(fft_size)
-        , ir(1)
-        , delay_left(1)
-        , delay_right(1)
-        , valid_channels(0) {
+        , delay_head(0)
+        , valid_channels(0)
+        , num_ir_blocks(0) {
 
         reset();
     }
@@ -216,18 +213,12 @@ public:
         compute_cache_left.init(0);
         compute_cache_right.init(0);
 
-        for (auto& delay: delay_left) {
-            delay.init(0);
-        }
-        for (auto& delay: delay_right) {
-            delay.init(0);
+        if (num_ir_blocks > 0) {
+            delay_left.init(0);
+            delay_right.init(0);
         }
 
-        for (int i = 0; i < ir.size(); i++) {
-            for (int j = 0; j < valid_channels; j++) {
-                ir[i][j].init(0);
-            }
-        }
+        delay_head = 0;
 
         valid_channels = 0;
     }
@@ -259,37 +250,47 @@ public:
 
         normalize();
 
-        this->ir.resize(std::ceil(samples[0].size() / (float)samples_per_channel));
+        num_ir_blocks = (int)std::ceil(samples[0].size() / (float)samples_per_channel);
 
-        delay_left.resize(this->ir.size());
-        delay_right.resize(this->ir.size());
+        this->ir = FFTWFComplexArray(num_ir_blocks * valid_channels * fft_size);
+        this->ir.init(0);
 
-        for (auto& delay: delay_left) {
-            delay.init(0);
-        }
-        for (auto& delay: delay_right) {
-            delay.init(0);
-        }
+        delay_left = FFTWFComplexArray(num_ir_blocks * fft_size);
+        delay_right = FFTWFComplexArray(num_ir_blocks * fft_size);
+        delay_left.init(0);
+        delay_right.init(0);
+        delay_head = 0;
 
-        for (int i = 0; i < this->ir.size(); i++) {
+        FFTWFComplexArray tmp(fft_size);
+        for (int i = 0; i < num_ir_blocks; i++) {
             for (int j = 0; j < valid_channels; j++) {
                 int k;
-
                 for (k = 0; k < samples_per_channel && i * samples_per_channel + k < samples[j].size(); k++) {
-                    this->ir[i][j][k][0] = samples[j][i * samples_per_channel + k];
-                    this->ir[i][j][k][1] = 0.0f;
+                    tmp[k][0] = samples[j][i * samples_per_channel + k];
+                    tmp[k][1] = 0.0f;
                 }
+                memset(tmp.get() + k, 0, (fft_size - k) * sizeof(fftwf_complex));
 
-                memset(this->ir[i][j].get() + k, 0, (fft_size - k) * sizeof(fftwf_complex));
+                forward_plan.execute(tmp, tmp);
 
-                forward_plan.execute(this->ir[i][j], this->ir[i][j]);
+                fftwf_complex* ir_block = this->ir.get() + i * fft_size * valid_channels;
+                for (int k = 0; k < fft_size; k++) {
+                    ir_block[k * valid_channels + j][0] = tmp[k][0];
+                    ir_block[k * valid_channels + j][1] = tmp[k][1];
+                }
             }
         }
     }
 
     void setIr(const std::string& ir_path) {
         if (!loadAudioFile(ir_path, samples)) {
-            return;
+            valid_channels = 2;
+            samples[0].resize(samples_per_channel);
+            samples[1].resize(samples_per_channel);
+            std::memset(samples[0].data(), 0, sizeof(float) * samples_per_channel);
+            std::memset(samples[1].data(), 0, sizeof(float) * samples_per_channel);
+            samples[0][0] = 1.0f;
+            samples[1][0] = 1.0f;
         }
 
         setIr(samples, valid_channels);
@@ -329,14 +330,17 @@ public:
             }
         }
 
-        std::rotate(delay_left.begin(), delay_left.end() - 1, delay_left.end());
-        std::rotate(delay_right.begin(), delay_right.end() - 1, delay_right.end());
+        delay_head = (delay_head - 1 + num_ir_blocks) % num_ir_blocks;
 
-        forward_plan.execute(sliding_window_left, delay_left[0]);
-        forward_plan.execute(sliding_window_right, delay_right[0]);
+        forward_plan.execute(sliding_window_left, compute_cache_left);
+        forward_plan.execute(sliding_window_right, compute_cache_right);
 
-        compute_cache_left.init(0);
-        compute_cache_right.init(0);
+        memcpy(delay_left.get() + delay_head * fft_size,
+               compute_cache_left.get(),
+               fft_size * sizeof(fftwf_complex));
+        memcpy(delay_right.get() + delay_head * fft_size,
+               compute_cache_right.get(),
+               fft_size * sizeof(fftwf_complex));
 
         if (valid_channels == 2) {
             multiply<2>();
@@ -366,46 +370,44 @@ private:
 
     template<int VALID_CHANNELS>
     void multiply() {
-        acc_left.init(0);
-        acc_right.init(0);
+        compute_cache_left.init(0);
+        compute_cache_right.init(0);
 
-        for (int i = 0; i < this->ir.size(); i++) {
-            const auto& dl = delay_left[i];
-            const auto& dr = delay_right[i];
-            const auto& ir0 = this->ir[i][0];
-            const auto& ir1 = this->ir[i][1];
-            const auto& ir2 = this->ir[i][2];
-            const auto& ir3 = this->ir[i][3];
+        const fftwf_complex* ir_base = this->ir.get();
 
-            for (int j = 0; j < fft_size; j++) {
-                acc_left[j][0] +=
-                    dl[j][0] * ir0[j][0] - dl[j][1] * ir0[j][1];
-                acc_left[j][1] +=
-                    dl[j][0] * ir0[j][1] + dl[j][1] * ir0[j][0];
-                if constexpr (VALID_CHANNELS == 4) {
-                    acc_left[j][0] +=
-                        dl[j][0] * ir2[j][0] - dl[j][1] * ir2[j][1];
-                    acc_left[j][1] +=
-                        dl[j][0] * ir2[j][1] + dl[j][1] * ir2[j][0];
-                }
-            }
+        for (int i = 0; i < num_ir_blocks; i++) {
+            const int delay_idx = (delay_head + i) % num_ir_blocks;
+            const fftwf_complex* dl = delay_left.get() + delay_idx * fft_size;
+            const fftwf_complex* dr = delay_right.get() + delay_idx * fft_size;
+
+            const fftwf_complex* ir_ptr = ir_base + i * fft_size * VALID_CHANNELS;
 
             for (int j = 0; j < fft_size; j++) {
-                acc_right[j][0] +=
-                    dr[j][0] * ir1[j][0] - dr[j][1] * ir1[j][1];
-                acc_right[j][1] +=
-                    dr[j][0] * ir1[j][1] + dr[j][1] * ir1[j][0];
+                const float dlr = dl[j][0];
+                const float dli = dl[j][1];
+                const float drr = dr[j][0];
+                const float dri = dr[j][1];
+
+                const fftwf_complex& ir0 = ir_ptr[0];
+                const fftwf_complex& ir1 = ir_ptr[1];
+
+                compute_cache_left[j][0] += dlr * ir0[0] - dli * ir0[1];
+                compute_cache_left[j][1] += dlr * ir0[1] + dli * ir0[0];
+                compute_cache_right[j][0] += drr * ir1[0] - dri * ir1[1];
+                compute_cache_right[j][1] += drr * ir1[1] + dri * ir1[0];
+
                 if constexpr (VALID_CHANNELS == 4) {
-                    acc_right[j][0] +=
-                        dr[j][0] * ir3[j][0] - dr[j][1] * ir3[j][1];
-                    acc_right[j][1] +=
-                        dr[j][0] * ir3[j][1] + dr[j][1] * ir3[j][0];
+                    const fftwf_complex& ir2 = ir_ptr[2];
+                    const fftwf_complex& ir3 = ir_ptr[3];
+                    compute_cache_left[j][0] += dlr * ir2[0] - dli * ir2[1];
+                    compute_cache_left[j][1] += dlr * ir2[1] + dli * ir2[0];
+                    compute_cache_right[j][0] += drr * ir3[0] - dri * ir3[1];
+                    compute_cache_right[j][1] += drr * ir3[1] + dri * ir3[0];
                 }
+
+                ir_ptr += VALID_CHANNELS;
             }
         }
-
-        memcpy(compute_cache_left.get(), acc_left.get(), sizeof(fftwf_complex) * fft_size);
-        memcpy(compute_cache_right.get(), acc_right.get(), sizeof(fftwf_complex) * fft_size);
     }
 
     /* max load 65536 samples per channel */
@@ -464,8 +466,6 @@ private:
     int samples_per_frame = getSamplesPerChannel() * getChannels();
 
     FFTWFComplexArray cache;
-    FFTWFComplexArray acc_left;
-    FFTWFComplexArray acc_right;
 
     AudioFile<float> ir_file;
 
@@ -481,10 +481,12 @@ private:
     FFTWFComplexArray sliding_window_left;
     FFTWFComplexArray sliding_window_right;
 
-    std::vector<std::array<FFTWFComplexArray, 4>> ir;
+    FFTWFComplexArray ir;
+    int num_ir_blocks;
 
-    std::vector<FFTWFComplexArray> delay_left;
-    std::vector<FFTWFComplexArray> delay_right;
+    FFTWFComplexArray delay_left;
+    FFTWFComplexArray delay_right;
+    int delay_head;
 };
 
 #endif
