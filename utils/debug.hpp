@@ -55,15 +55,21 @@ inline const char* get_filename(const char* path) {
 
 #ifdef _WIN32
 #include <windows.h>
+#include <cstdio>
+#include <string>
 #define LOG_TAG_NATIVE "wecho-native"
 
 #define LOG_D(fmt, ...)\
     do {\
-        char __tmp_buffer[1024];\
-        sprintf_s(__tmp_buffer, 1024, "[%s] [%s:%d] " fmt "\n", \
-                        LOG_TAG_NATIVE, get_filename(__FILE__), __LINE__, \
-                        ##__VA_ARGS__);\
-        OutputDebugStringA(__tmp_buffer);\
+        std::string __tmp_buffer;\
+        const int __tmp_len = _vscprintf("[%s] [%s:%d] " fmt "\n", \
+                                         LOG_TAG_NATIVE, get_filename(__FILE__), __LINE__, \
+                                         ##__VA_ARGS__);\
+        __tmp_buffer.resize(__tmp_len + 1);\
+        sprintf_s(__tmp_buffer.data(), __tmp_len + 1, "[%s] [%s:%d] " fmt "\n", \
+                  LOG_TAG_NATIVE, get_filename(__FILE__), __LINE__, \
+                  ##__VA_ARGS__);\
+        OutputDebugStringA(__tmp_buffer.c_str());\
     } while(0);
 
 #define LOG_E(fmt, ...) LOG_D(fmt, ##__VA_ARGS__)

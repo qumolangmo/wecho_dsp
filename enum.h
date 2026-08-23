@@ -37,7 +37,6 @@ struct Coeffs {
     int32_t gain;
 };
 
-using IIREqualizerCoeffs = std::array<Coeffs, 10>;
 using ScriptParamsArray = ScriptParams[16];
 
 enum ParamType {
@@ -77,7 +76,7 @@ enum ParamType {
     X(LOW_CAT_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
     X(LOW_CAT_EFFECT_CUTOFF_FREQ, int, PARAM_TYPE_INT) \
     X(IIR_EQUALIZER_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
-    X(IIR_EQUALIZER_EFFECT_COEFFS, IIREqualizerCoeffs, PARAM_TYPE_ARRAY) \
+    X(IIR_EQUALIZER_EFFECT_CONFIG, std::string, PARAM_TYPE_STRING) \
     X(VIRTUALBASS_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
     X(VIRTUALBASS_EFFECT_ENVELOPE_RATE, int, PARAM_TYPE_INT) \
     X(VIRTUALBASS_EFFECT_MID_GAIN, float, PARAM_TYPE_FLOAT) \

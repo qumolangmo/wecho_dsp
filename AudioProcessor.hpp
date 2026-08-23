@@ -52,7 +52,11 @@ public:
             } else if constexpr (std::is_same_v<T, float>) {
                 LOG_D("update %s: %.2f", params_name[param_id], data);
             } else if constexpr (std::is_same_v<T, std::string>) {
-                LOG_D("update %s: %.*s", params_name[param_id], 256, data.c_str());
+                if (param_id == SCRIPT_EFFECT_CODE) {
+                    LOG_D("update %s, config ignored print", params_name[param_id]);
+                } else {
+                    LOG_D("update %s: %.*s", params_name[param_id], 1024, data.c_str());
+                }
             }
 
             func(data, initialize);
@@ -250,8 +254,8 @@ private:
                         effect.setEnabled(enabled);
                     }, initialize);
                 }))},
-            {IIR_EQUALIZER_EFFECT_COEFFS,
-                ParamSetter(IIR_EQUALIZER_EFFECT_COEFFS, std::function<void(IIREqualizerCoeffs, bool)>([this](IIREqualizerCoeffs coeffs, bool initialize) {
+            {IIR_EQUALIZER_EFFECT_CONFIG,
+                ParamSetter(IIR_EQUALIZER_EFFECT_CONFIG, std::function<void(std::string, bool)>([this](std::string coeffs, bool initialize) {
                     EIIREQualizer.update([coeffs](IIREqualizerEffect& effect) {
                         effect.setCoeffs(coeffs);
                     }, initialize);

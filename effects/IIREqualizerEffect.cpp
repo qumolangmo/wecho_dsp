@@ -22,26 +22,10 @@
 IIREqualizerEffect::IIREqualizerEffect(bool enabled) 
     : Effect(enabled) {
 
-    biquads[0].resize(10);
-    biquads[1].resize(10);
-
-    coeffs[0] = {0, 20, 63, 0};
-    coeffs[1] = {1, 63, 125, 0};
-    coeffs[2] = {2, 125, 250, 0};
-    coeffs[3] = {3, 250, 500, 0};
-    coeffs[4] = {4, 500, 1000, 0};
-    coeffs[5] = {5, 1000, 2000, 0};
-    coeffs[6] = {6, 2000, 4000, 0};
-    coeffs[7] = {7, 4000, 8000, 0};
-    coeffs[8] = {8, 8000, 16000, 0};
-    coeffs[9] = {9, 16000, 20000, 0};
-
-    for (auto& channel: biquads) {
-        for (int i = 0; i < 10; i++) {
-            channel[i].setPeak({static_cast<float>(coeffs[i].start_freq), 1.0f, static_cast<float>(coeffs[i].gain)});
-        }
-    }
+    biquads[0].reserve(20);
+    biquads[1].reserve(20);
 }
+
 IIREqualizerEffect::~IIREqualizerEffect() {}
 
 void IIREqualizerEffect::run(std::span<float> audio) {
@@ -49,14 +33,20 @@ void IIREqualizerEffect::run(std::span<float> audio) {
 
     float origin_l, origin_r;
 
+    float inner_preamp = this->preamp.load(std::memory_order_relaxed);
+    inner_preamp = std::pow(10, inner_preamp / 20.0f);
+
+    for (auto& sample: audio) {
+        sample *= inner_preamp;
+    }
+
     for (int i = 0; i < audio.size(); i += 2) {
         origin_l = audio[i];
         origin_r = audio[i + 1];
 
-        for (int j = 0; j < 10; j++) {
+        for (int j = 0; j < biquads[0].size(); j++) {
             origin_l = biquads[0][j].process(origin_l);
             origin_r = biquads[1][j].process(origin_r);
-            
         }
         
         audio[i] = origin_l;
@@ -69,19 +59,44 @@ Priority IIREqualizerEffect::priority() const {
 }
 
 void IIREqualizerEffect::reset() {
-    for (auto& channel: biquads) {
-        for (int i = 0; i < 10; i++) {
-            channel[i].reset();
-        }
-    }
+    biquads[0].clear();
+    biquads[1].clear();
 }
 
-void IIREqualizerEffect::setCoeffs(IIREqualizerCoeffs coeffs) {
+void IIREqualizerEffect::setCoeffs(std::string coeffs) {
     this->coeffs = coeffs;
     
-    for (auto& channel: biquads) {
-        for (int i = 0; i < 10; i++) {
-            channel[i].setPeak({static_cast<float>(this->coeffs[i].start_freq), 1.0f, static_cast<float>(this->coeffs[i].gain)});
+    const auto& filter_group = parser.parse(coeffs);
+    this->preamp.store(parser.getPreamp(), std::memory_order_relaxed);
+    
+
+    biquads[0].clear();
+    biquads[1].clear();
+
+    for (int i = 0; i < filter_group.size(); i++) {
+        biquads[0].emplace_back(Biquad<1>());
+        biquads[1].emplace_back(Biquad<1>());
+
+        auto& left = biquads[0].back();
+        auto& right = biquads[1].back();
+        auto& param = filter_group[i];
+
+        switch (filter_group[i].type) {
+            case ParameterEqParser::FilterType::PK: {
+                left.setPeak({{param.fc, param.q, param. gain}});
+                right.setPeak({{param.fc, param.q, param.gain}});
+                break;
+            }
+            case ParameterEqParser::FilterType::LSC: {
+                left.setLowShelf({{param.fc, param.q, param.gain}});
+                right.setLowShelf({{param.fc, param.q, param.gain}});
+                break;
+            }
+            case ParameterEqParser::FilterType::HSC: {
+                left.setHighShelf({{param.fc, param.q, param.gain}});
+                right.setHighShelf({{param.fc, param.q, param.gain}});
+                break;
+            }
         }
     }
 }
@@ -90,5 +105,6 @@ void IIREqualizerEffect::copyParamsFrom(const IIREqualizerEffect& other) {
     reset();
 
     this->coeffs = other.coeffs;
+    this->setCoeffs(other.coeffs);
     this->setEnabled(other.isEnabled());
 }

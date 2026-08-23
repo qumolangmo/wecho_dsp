@@ -31,6 +31,7 @@
 #include "../utils/SoftLimiter.hpp"
 #include "../tcc/libtcc.h"
 #include "../scripting/wecho_dsp_c_api.h"
+#include "../utils/parameterEqParser.hpp"
 
 #include <span>
 
@@ -316,7 +317,7 @@ public:
     Priority priority() const override;
     void reset() override;
 
-    void setCoeffs(IIREqualizerCoeffs coeffs);
+    void setCoeffs(std::string coeffs);
 
     void copyParamsFrom(const IIREqualizerEffect& other);
     static constexpr BufferType bufferType() { return BufferType::INTERLEAVED; }
@@ -326,7 +327,9 @@ public:
 
 private:
     std::vector<Biquad<1>> biquads[2];
-    IIREqualizerCoeffs coeffs;
+    ParameterEqParser parser;
+    std::atomic<float> preamp;
+    std::string coeffs;
 };
 
 class ReverbEffect: public Effect {
