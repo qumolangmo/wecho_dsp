@@ -226,6 +226,17 @@ public:
         return T::bufferType();
     }
 
+    T& latestEffect() {
+        if (is_cross_fading.load(std::memory_order_acquire)
+            || is_fade_in.load(std::memory_order_acquire)
+            || is_fade_out.load(std::memory_order_acquire)) {
+
+            return *target;
+        }
+
+        return *current;
+    }
+
 private:
     template<typename F>
     void startFade(F setNewParam) {

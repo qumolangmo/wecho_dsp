@@ -85,6 +85,7 @@ private:
     // CrossFader<ScriptEffect> EScript;
     std::unique_ptr<ScriptEffect> EScript;
     std::unique_ptr<CrossFader<DiffSurroundingEffect>> EDiffSurrounding;
+    std::unique_ptr<CrossFader<DeviceSimulationEffect>> EDeviceSimulation;
 
     std::unordered_map<ParamID, ParamSetter> param_map;
     AudioStream audio_stream;
@@ -107,7 +108,8 @@ private:
         , EVirtualBass(std::make_unique<CrossFader<VirtualBassEffect>>(100, false))
         , EReverb(std::make_unique<CrossFader<ReverbEffect>>(300, false))
         , EScript(std::make_unique<ScriptEffect>(false))
-        , EDiffSurrounding(std::make_unique<CrossFader<DiffSurroundingEffect>>(30, false, 3)) {
+        , EDiffSurrounding(std::make_unique<CrossFader<DiffSurroundingEffect>>(30, false, 3))
+        , EDeviceSimulation(std::make_unique<CrossFader<DeviceSimulationEffect>>(100, false)) {
 
         param_map = {
             {MASTER_EFFECT_ENABLED,
@@ -368,6 +370,18 @@ private:
                 ParamSetter(SCRIPT_EFFECT_PARAMS, std::function<void(ScriptParams*, bool)>([this](ScriptParams* params, bool) {
                     EScript->setParams(params);
                 }))},
+            {DEVICE_SIMULATION_EFFECT_ENABLED,
+                ParamSetter(DEVICE_SIMULATION_EFFECT_ENABLED, std::function<void(bool, bool)>([this](bool enabled, bool initialize) {
+                    EDeviceSimulation->update([enabled](DeviceSimulationEffect& effect) {
+                        effect.setEnabled(enabled);
+                    }, initialize);
+                }))},
+            {DEVICE_SIMULATION_EFFECT_CONFIG,
+                ParamSetter(DEVICE_SIMULATION_EFFECT_CONFIG, std::function<void(std::string, bool)>([this](std::string config, bool initialize) {
+                    EDeviceSimulation->update([config](DeviceSimulationEffect& effect) {
+                        effect.setFreqResponseConfig(config);
+                    }, initialize);
+                }))},
         };
     }
 
@@ -395,7 +409,7 @@ public:
         audio_stream << input;
 
         /* Ensure that all effects requiring planar buffers are placed consecutively in the processing chain */
-        audio_stream >> *EChannelBalance >> *EDiffSurrounding
+        audio_stream >> *EDeviceSimulation >> *EChannelBalance >> *EDiffSurrounding
                      >> *EIIREQualizer >> *EEvenHarmonic >> *EBass >> *EClarity 
                      >> *EVirtualBass >> *EReverb 
                      /* planar buffer start */
@@ -407,6 +421,10 @@ public:
 
     void setEffectParam(ParamID param, std::any value, bool initialize = false) {
         param_map[param](param, value, initialize);
+    }
+
+    std::vector<float> getDeviceSimulationFreqResponse() {
+        return EDeviceSimulation->latestEffect().getFreqResponseDb();
     }
 
     void reset() {
@@ -421,6 +439,7 @@ public:
         ELookAheadSoftLimiter->reset();
         ELowCat->reset();
         EVirtualBass->reset();
+        EDeviceSimulation->reset();
     }
 };
 #endif

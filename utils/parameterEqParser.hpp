@@ -93,6 +93,7 @@ private:
     std::vector<FilterParam> data;
     float preamp;
 
+public:
     static inline std::string_view trim(std::string_view str) {
         auto start = str.find_first_not_of(" \t\n\r");
         if (start == std::string_view::npos) {

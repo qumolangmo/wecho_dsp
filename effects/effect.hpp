@@ -32,6 +32,7 @@
 #include "../tcc/libtcc.h"
 #include "../scripting/wecho_dsp_c_api.h"
 #include "../utils/parameterEqParser.hpp"
+#include "../utils/frequencyResponseReader.hpp"
 
 #include <span>
 
@@ -500,5 +501,41 @@ private:
     DelayLine<1024> delay_line;
 };
 
+class DeviceSimulationEffect: public Effect {
+public:
+    DeviceSimulationEffect(bool enabled);
+    ~DeviceSimulationEffect();
+
+    void run(std::span<float> audio) override;
+    Priority priority() const override;
+    void reset() override;
+
+    void setFreqResponseConfig(std::string config);
+
+    void copyParamsFrom(const DeviceSimulationEffect& other);
+    static constexpr BufferType bufferType() { return BufferType::PLANAR; }
+
+    const std::vector<float>& getFreqResponseDb() const { return freq_response_db; }
+
+private:
+    void setFreqResponseFile(std::string self, std::string target);
+    auto generateIr(const std::vector<float>& freq_bins, const std::vector<float>& mags) -> std::vector<std::vector<float>>;
+    void computeFreqResponse(const std::vector<float>& ir);
+
+    FFTWFComplexArray cache;
+    FFTWFPlan forward_plan;
+    FFTWFPlan backward_plan;
+    FrequencyResponseReader self_fr_reader;
+    FrequencyResponseReader target_fr_reader;
+    std::string config;
+    std::vector<float> freq_response_db;
+
+    bool runable;
+
+    Convolver convolver;
+
+    static constexpr int fft_size = 16384;
+    static constexpr int fft_half = fft_size / 2;
+};
 
 #endif

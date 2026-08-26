@@ -200,7 +200,8 @@ public:
         , cache(fft_size)
         , delay_head(0)
         , valid_channels(0)
-        , num_ir_blocks(0) {
+        , num_ir_blocks(0)
+        , mix(1.0f) {
 
         reset();
     }
@@ -232,7 +233,8 @@ public:
             }
         }
 
-        float gain = 1 / std::sqrt(energy);
+        float compensation = std::sqrt(raw_channels > 0 ? raw_channels : 1.0f);
+        float gain = compensation / std::sqrt(energy);
 
         for (int i = 0; i < valid_channels; i++) {
             for (int j = 0; j < samples[i].size(); j++) {
@@ -432,6 +434,7 @@ private:
             samples[1].resize(j);
 
             valid_channels = 2;
+            raw_channels = 1;
         } else if (ir.getNumChannels() == 2) {
             int i, j;
 
@@ -444,6 +447,7 @@ private:
             }
 
             valid_channels = 2;
+            raw_channels = 2;
         } else if (ir.getNumChannels() == 4) {
             int i, j;
 
@@ -456,6 +460,7 @@ private:
             }
 
             valid_channels = 4;
+            raw_channels = 4;
         }
 
         return true;
@@ -472,6 +477,7 @@ private:
     std::vector<std::vector<float>> samples;
     std::atomic<float> mix;
     int valid_channels;
+    int raw_channels;
 
     FFTWFPlan forward_plan, backward_plan;
 
