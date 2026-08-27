@@ -29,7 +29,6 @@
 #include "../utils/AudioFile.hpp"
 #include <memory>
 #include <filesystem>
-#include <algorithm>
 #include <fstream>
 #include <span>
 #include "utils.h"
@@ -195,9 +194,8 @@ public:
         , compute_cache_right(fft_size)
         , sliding_window_left(fft_size)
         , sliding_window_right(fft_size)
-        , forward_plan(fft_size, FFTW_FORWARD, compute_cache_left, compute_cache_right, FFTW_ESTIMATE)
-        , backward_plan(fft_size, FFTW_BACKWARD, compute_cache_right, compute_cache_left, FFTW_ESTIMATE)
-        , cache(fft_size)
+        , forward_plan(fft_size, FFTW_FORWARD, compute_cache_left, compute_cache_left, FFTW_ESTIMATE)
+        , backward_plan(fft_size, FFTW_BACKWARD, compute_cache_right, compute_cache_right, FFTW_ESTIMATE)
         , delay_head(0)
         , valid_channels(0)
         , num_ir_blocks(0)
@@ -469,8 +467,6 @@ private:
     int samples_per_channel = getSamplesPerChannel();
     int fft_size = getSamplesPerChannel() * 2;
     int samples_per_frame = getSamplesPerChannel() * getChannels();
-
-    FFTWFComplexArray cache;
 
     AudioFile<float> ir_file;
 
