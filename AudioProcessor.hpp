@@ -202,12 +202,6 @@ private:
                         effect.setIr(ir_path);
                     }, initialize);
                 }))},
-            {CONVOLVE_EFFECT_IR_DATA,
-                ParamSetter(CONVOLVE_EFFECT_IR_DATA, std::function<void(std::vector<std::vector<float>>&, bool)>([this](std::vector<std::vector<float>>& ir_data, bool initialize) {
-                    EConvolve->update([ir_data](ConvolveEffect& effect) {
-                        effect.setIr(ir_data);
-                    }, initialize);
-                }))},
             {COMPRESSOR_EFFECT_ENABLED,
                 ParamSetter(COMPRESSOR_EFFECT_ENABLED, std::function<void(bool, bool)>([this](bool enabled, bool) {
                     ECompressor->setEnabled(enabled);
@@ -392,11 +386,12 @@ public:
     }
 
     static void init(std::string_view files_dir, int sample_rate, int samples_per_channel, int channels) {
-        // FFTWFPlan::initWisdom(std::string(files_dir) + "/fftw_wisdom");
-        ScriptEffect::setCacheDir(files_dir);
         Utils::setChannels(channels);
         Utils::setSampleRate(sample_rate);
         Utils::setSamplesPerChannel(samples_per_channel);
+
+        FFTWFPlan::initWisdom(std::string(files_dir) + "/fftw_wisdom_" + std::to_string(samples_per_channel));
+        ScriptEffect::setCacheDir(files_dir);
     }
 
     // TODO: check out KFR/DSP

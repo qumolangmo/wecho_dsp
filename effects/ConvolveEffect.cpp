@@ -20,13 +20,9 @@
 #include "effect.hpp"
 #include <atomic>
 
-bool FFTWFPlan::wisdom_imported = false;
-std::string FFTWFPlan::wisdom_path = "";
-
 ConvolveEffect::ConvolveEffect(bool enabled, float mix)
     : Effect(enabled)
     , mix(mix)
-    , ir_data(0)
     , ir_path("") {
 
     convolver.setIr("this_is_an_message_of_init_convolve_effect___not_an_error");
@@ -59,19 +55,10 @@ void ConvolveEffect::setIr(const std::string& ir_path) {
     convolver.setIr(ir_path);
 }
 
-void ConvolveEffect::setIr(const std::vector<std::vector<float>>& ir_data) {
-    this->ir_data = ir_data;
-    convolver.setIr(ir_data, ir_data.size());
-}
-
 void ConvolveEffect::copyParamsFrom(const ConvolveEffect& other) {
     reset();
 
-    if (other.ir_data.empty()) {
-        setIr(other.ir_path);
-    } else {
-        setIr(other.ir_data);
-    }
+    setIr(other.ir_path);
 
     setMix(other.mix.load(std::memory_order_acquire));
 

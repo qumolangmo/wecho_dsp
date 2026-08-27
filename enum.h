@@ -26,7 +26,6 @@
 #include <string>
 #include "scripting/wecho_dsp_c_api.h"
 
-using FloatArray = float[65536 * 2];
 using FileName = char[4096];
 using ScriptCode = char[65536 * 2];
 
@@ -65,7 +64,6 @@ enum ParamType {
     X(CONVOLVE_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
     X(CONVOLVE_EFFECT_MIX, float, PARAM_TYPE_FLOAT) \
     X(CONVOLVE_EFFECT_IR_PATH, FileName, PARAM_TYPE_STRING) \
-    X(CONVOLVE_EFFECT_IR_DATA, FloatArray, PARAM_TYPE_ARRAY) \
     X(COMPRESSOR_EFFECT_ENABLED, bool, PARAM_TYPE_BOOL) \
     X(COMPRESSOR_EFFECT_THRESHOLD, int, PARAM_TYPE_INT) \
     X(COMPRESSOR_EFFECT_RATIO, int, PARAM_TYPE_INT) \

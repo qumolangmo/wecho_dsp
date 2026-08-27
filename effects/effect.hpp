@@ -196,7 +196,6 @@ public:
     void reset() override;
 
     void setIr(const std::string& ir_path);
-    void setIr(const std::vector<std::vector<float>>& ir_data);
     void setMix(float mix);
 
     void copyParamsFrom(const ConvolveEffect& other);
@@ -208,7 +207,6 @@ public:
 private:
     std::atomic<float> mix;
     std::string ir_path;
-    std::vector<std::vector<float>> ir_data;
 
     Convolver convolver;
 };

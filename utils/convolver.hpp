@@ -29,7 +29,6 @@
 #include "../utils/AudioFile.hpp"
 #include <memory>
 #include <filesystem>
-#include <fstream>
 #include <span>
 #include "utils.h"
 
@@ -108,64 +107,30 @@ private:
     int sign;
     unsigned int flags;
 
-    static void importWisdom() {
-        if (std::filesystem::exists(wisdom_path) && !wisdom_imported) {
-            fftwf_import_wisdom_from_filename(wisdom_path.data());
-            wisdom_imported = true;
-        }
-    }
-
-    static void exportWisdom() {
-        if (std::filesystem::exists(wisdom_path) && wisdom_imported) {
-            fftwf_export_wisdom_to_filename(wisdom_path.data());
-        }
-    }
+    static inline std::string wisdom_path;
 
 public:
-    static void initWisdom(std::string_view _wisdom_path) {
-        wisdom_path = _wisdom_path;
+    static void initWisdom(std::string_view path) {
+        wisdom_path = path;
+        auto dir = std::filesystem::path(wisdom_path).parent_path();
 
-        std::filesystem::path wisdom_dir = std::filesystem::path(wisdom_path).parent_path();
-        if (!std::filesystem::exists(wisdom_dir)) {
-            std::filesystem::create_directories(wisdom_dir);
+        if (!dir.empty() && !std::filesystem::exists(dir)) {
+            std::filesystem::create_directories(dir);
         }
-
-        std::string version_path = std::string(wisdom_path) + ".version";
 
         if (std::filesystem::exists(wisdom_path)) {
-            if (std::filesystem::exists(version_path)) {
-                std::ifstream ver_file(version_path);
-                int stored_fft_size = 0;
-                if (ver_file >> stored_fft_size && stored_fft_size != (getSamplesPerChannel() * 2)) {
-                    std::filesystem::remove(wisdom_path);
-                    std::filesystem::remove(version_path);
-                }
-            } else {
-                std::filesystem::remove(wisdom_path);
-            }
-        }
-
-        if (!std::filesystem::exists(wisdom_path)) {
-            importWisdom();
-
-            FFTWFComplexArray tmp(getSamplesPerChannel() * 2);
-            FFTWFPlan plan(getSamplesPerChannel() * 2, FFTW_FORWARD, tmp, tmp, FFTW_MEASURE);
-            FFTWFPlan backward_plan(getSamplesPerChannel() * 2, FFTW_BACKWARD, tmp, tmp, FFTW_MEASURE);
-
-            std::ofstream ver_file(version_path);
-            ver_file << getSamplesPerChannel() * 2;
+            fftwf_import_wisdom_from_filename(wisdom_path.c_str());
         } else {
-            importWisdom();
+            FFTWFComplexArray tmp(getSamplesPerChannel() * 2);
+            FFTWFComplexArray tmp2(getSamplesPerChannel() * 2);
+
+            FFTWFPlan forward_plan(getSamplesPerChannel() * 2, FFTW_FORWARD, tmp, tmp, FFTW_MEASURE);
+            FFTWFPlan backward_plan(getSamplesPerChannel() * 2, FFTW_BACKWARD, tmp, tmp, FFTW_MEASURE);
+            FFTWFPlan forward_plan_outplace(getSamplesPerChannel() * 2, FFTW_FORWARD, tmp, tmp2, FFTW_MEASURE);
+            FFTWFPlan backward_plan_outplace(getSamplesPerChannel() * 2, FFTW_BACKWARD, tmp, tmp2, FFTW_MEASURE);
+
+            fftwf_export_wisdom_to_filename(wisdom_path.c_str());
         }
-        
-    }
-
-    static std::string wisdom_path;
-
-    static bool wisdom_imported;
-
-    static void saveWisdom() {
-        exportWisdom();
     }
 
     FFTWFPlan(size_t n, int sign, FFTWFComplexArray& in, FFTWFComplexArray& out, unsigned int flags = FFTW_WISDOM_ONLY)
@@ -189,17 +154,20 @@ class Convolver: public Utils {
 public:
     Convolver()
         : Utils()
-        , samples(4, std::vector<float>(MAX_SAMPLES_PER_CHANNEL))
+        , samples(4, std::vector<float>(2 << 16))
         , compute_cache_left(fft_size)
         , compute_cache_right(fft_size)
         , sliding_window_left(fft_size)
         , sliding_window_right(fft_size)
-        , forward_plan(fft_size, FFTW_FORWARD, compute_cache_left, compute_cache_left, FFTW_ESTIMATE)
-        , backward_plan(fft_size, FFTW_BACKWARD, compute_cache_right, compute_cache_right, FFTW_ESTIMATE)
+        , forward_plan(fft_size, FFTW_FORWARD, compute_cache_left, compute_cache_left)
+        , backward_plan(fft_size, FFTW_BACKWARD, compute_cache_right, compute_cache_right)
+        , forward_plan_outplace(fft_size, FFTW_FORWARD, compute_cache_left, compute_cache_right)
+        , backward_plan_outplace(fft_size, FFTW_BACKWARD, compute_cache_left, compute_cache_right)
         , delay_head(0)
         , valid_channels(0)
         , num_ir_blocks(0)
-        , mix(1.0f) {
+        , mix(1.0f)
+        , raw_channels(2) {
 
         reset();
     }
@@ -332,8 +300,8 @@ public:
 
         delay_head = (delay_head - 1 + num_ir_blocks) % num_ir_blocks;
 
-        forward_plan.execute(sliding_window_left, compute_cache_left);
-        forward_plan.execute(sliding_window_right, compute_cache_right);
+        forward_plan_outplace.execute(sliding_window_left, compute_cache_left);
+        forward_plan_outplace.execute(sliding_window_right, compute_cache_right);
 
         memcpy(delay_left.get() + delay_head * fft_size,
                compute_cache_left.get(),
@@ -366,8 +334,6 @@ public:
     }
 
 private:
-    static constexpr int MAX_SAMPLES_PER_CHANNEL = 65536;
-
     template<int VALID_CHANNELS>
     void multiply() {
         compute_cache_left.init(0);
@@ -410,9 +376,7 @@ private:
         }
     }
 
-    /* max load 65536 samples per channel */
     bool loadAudioFile(const std::string& path, std::vector<std::vector<float>>& samples) {
-        /* reserve 1MB date area default */
         static AudioFile<float> ir;
 
         if (!ir.load(path)) {
@@ -420,10 +384,9 @@ private:
         }
 
         if (ir.getNumChannels() == 1) {
-            /* 128k samples = 128k * sizeof(float) = 512kB per cahnnel */
             int j;
 
-            for (j = 0; j < ir.getNumSamplesPerChannel() && j < MAX_SAMPLES_PER_CHANNEL; j++) {
+            for (j = 0; j < ir.getNumSamplesPerChannel(); j++) {
                 samples[0][j] = ir.samples[0][j];
                 samples[1][j] = ir.samples[0][j];
             }
@@ -437,7 +400,7 @@ private:
             int i, j;
 
             for (i = 0; i < 2; i++) {
-                for (j = 0; j < ir.getNumSamplesPerChannel() && j < MAX_SAMPLES_PER_CHANNEL; j++) {
+                for (j = 0; j < ir.getNumSamplesPerChannel(); j++) {
                     samples[i][j] = ir.samples[i][j];
                 }
 
@@ -450,7 +413,7 @@ private:
             int i, j;
 
             for (i = 0; i < 4; i++) {
-                for (j = 0; j < ir.getNumSamplesPerChannel() && j < MAX_SAMPLES_PER_CHANNEL; j++) {
+                for (j = 0; j < ir.getNumSamplesPerChannel(); j++) {
                     samples[i][j] = ir.samples[i][j];
                 }
 
@@ -475,8 +438,6 @@ private:
     int valid_channels;
     int raw_channels;
 
-    FFTWFPlan forward_plan, backward_plan;
-
     FFTWFComplexArray compute_cache_left;
     FFTWFComplexArray compute_cache_right;
 
@@ -489,6 +450,9 @@ private:
     FFTWFComplexArray delay_left;
     FFTWFComplexArray delay_right;
     int delay_head;
+
+    FFTWFPlan forward_plan, backward_plan;
+    FFTWFPlan forward_plan_outplace, backward_plan_outplace;
 };
 
 #endif
