@@ -62,12 +62,12 @@ public:
 
     void setAttackMs(int ms) {
         attack_ms = ms;
-        attack_coeff = 1.0f - std::exp(-1.0f / (sample_rate / 1000.0f * ms));
+        attack_coeff = 1.0f - std::exp(-std::log(10.0f) / (sample_rate / 1000.0f * ms));
     }
 
     void setReleaseMs(int ms) {
         release_ms = ms;
-        release_coeff = 1.0f - std::exp(-1.0f / (sample_rate / 1000.0f * ms));
+        release_coeff = 1.0f - std::exp(-std::log(10.0f) / (sample_rate / 1000.0f * ms));
     }
 
     void setMakeupGain(float gain) {
@@ -91,7 +91,6 @@ public:
         rms_sum += sample * sample;
 
         float rms = std::sqrt(std::max(0.0f, rms_sum / buffer.size()));
-        rms *= makeup_gain;
 
         if (rms > envelope) {
             envelope += attack_coeff * (rms - envelope);
@@ -99,7 +98,7 @@ public:
             envelope += release_coeff * (rms - envelope);
         }
 
-        return envelope;
+        return envelope * makeup_gain;
     }
 
 };

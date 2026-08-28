@@ -69,7 +69,7 @@ public:
 
     void setRelease(int release_ms) {
         if (release_ms > 0) {
-            release_coeff = std::exp(-1.0f / (release_ms * 0.001f * sample_rate));
+            release_coeff = std::exp(-std::log(10.0f) / (release_ms * 0.001f * sample_rate));
             release_coeff = std::min(release_coeff, 1.0f);
         } else {
             release_coeff = 0.0f;
@@ -78,7 +78,7 @@ public:
 
     void setAttack(int attack_ms) {
         if (attack_ms > 0) {
-            attack_coeff = 1.0f - std::exp(-1.0f / (attack_ms * 0.001f * sample_rate));
+            attack_coeff = std::exp(-std::log(10.0f) / (attack_ms * 0.001f * sample_rate));
             attack_coeff = std::min(attack_coeff, 1.0f);
         } else {
             attack_coeff = 0.0f;
