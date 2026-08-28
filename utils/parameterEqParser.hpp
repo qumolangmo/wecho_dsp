@@ -91,7 +91,7 @@ public:
 
 private:
     std::vector<FilterParam> data;
-    float preamp;
+    float preamp = 0.0f;
 
 public:
     static inline std::string_view trim(std::string_view str) {
