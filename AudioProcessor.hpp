@@ -57,6 +57,9 @@ public:
                 } else {
                     LOG_D("update %s: %.*s", params_name[param_id], 1024, data.c_str());
                 }
+            } else if constexpr (std::is_same_v<T, ScriptParams*>) {
+                LOG_D("update %s, front 5 params: %.2f, %.2f, %.2f, %.2f, %.2f", 
+                    params_name[param_id], data[0].value, data[1].value, data[2].value, data[3].value, data[4].value);
             }
 
             func(data, initialize);

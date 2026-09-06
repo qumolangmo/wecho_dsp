@@ -465,7 +465,7 @@ private:
     static std::string last_error;
 
     std::string code;
-    ScriptParamsArray params;
+    ScriptParamsArray params{};
     std::vector<AllocatedStructure> allocations;
 
     std::atomic_flag spin_lock = ATOMIC_FLAG_INIT;
