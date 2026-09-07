@@ -536,4 +536,32 @@ private:
     static constexpr int fft_half = fft_size / 2;
 };
 
+class BassResonatorEffect: public Effect {
+public:
+    BassResonatorEffect(bool enabled, float gain, float high_gain, float center_freq, float q);
+    ~BassResonatorEffect();
+
+    void run(std::span<float> audio) override;
+    Priority priority() const override;
+    void reset() override;
+
+    void setQ(float q);
+    void setGain(float gain);
+    void setHighGain(float high_gain);
+    void setCenterFreq(float center_freq);
+
+    void copyParamsFrom(const BassResonatorEffect& other);
+    static constexpr BufferType bufferType() { return BufferType::INTERLEAVED; }
+
+private:
+    std::atomic<float> gain;
+    std::atomic<float> high_gain;
+    std::atomic<float> center_freq;
+    std::atomic<float> q;
+
+    Biquad<1> hp[2], lp[2], high_shelf[2];
+
+    static constexpr float hp_q = 1.0f;
+};
+
 #endif

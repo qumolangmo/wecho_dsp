@@ -89,6 +89,7 @@ private:
     std::unique_ptr<ScriptEffect> EScript;
     std::unique_ptr<CrossFader<DiffSurroundingEffect>> EDiffSurrounding;
     std::unique_ptr<CrossFader<DeviceSimulationEffect>> EDeviceSimulation;
+    std::unique_ptr<CrossFader<BassResonatorEffect>> EBassResonator;
 
     std::unordered_map<ParamID, ParamSetter> param_map;
     AudioStream audio_stream;
@@ -112,7 +113,8 @@ private:
         , EReverb(std::make_unique<CrossFader<ReverbEffect>>(300, false))
         , EScript(std::make_unique<ScriptEffect>(false))
         , EDiffSurrounding(std::make_unique<CrossFader<DiffSurroundingEffect>>(30, false, 3))
-        , EDeviceSimulation(std::make_unique<CrossFader<DeviceSimulationEffect>>(100, false)) {
+        , EDeviceSimulation(std::make_unique<CrossFader<DeviceSimulationEffect>>(100, false))
+        , EBassResonator(std::make_unique<CrossFader<BassResonatorEffect>>(100, false, 0.4f, -4.0f, 150.0f, 1.6f)) {
 
         param_map = {
             {MASTER_EFFECT_ENABLED,
@@ -379,6 +381,36 @@ private:
                         effect.setFreqResponseConfig(config);
                     }, initialize);
                 }))},
+            {BASS_RESONATOR_EFFECT_ENABLED,
+                ParamSetter(BASS_RESONATOR_EFFECT_ENABLED, std::function<void(bool, bool)>([this](bool enabled, bool initialize) {
+                    EBassResonator->update([enabled](BassResonatorEffect& effect) {
+                        effect.setEnabled(enabled);
+                    }, initialize);
+                }))},
+            {BASS_RESONATOR_EFFECT_HIGH_GAIN, 
+                ParamSetter(BASS_RESONATOR_EFFECT_HIGH_GAIN, std::function<void(float, bool)>([this](float high_gain, bool initialize) {
+                    EBassResonator->update([high_gain](BassResonatorEffect& effect) {
+                        effect.setHighGain(high_gain);
+                    }, initialize);
+                }))},
+            {BASS_RESONATOR_EFFECT_GAIN,
+                ParamSetter(BASS_RESONATOR_EFFECT_GAIN, std::function<void(float, bool)>([this](float gain, bool initialize) {
+                    EBassResonator->update([gain](BassResonatorEffect& effect) {
+                        effect.setGain(gain);
+                    }, initialize);
+                }))},
+            {BASS_RESONATOR_EFFECT_CENTER_FREQ,
+                ParamSetter(BASS_RESONATOR_EFFECT_CENTER_FREQ, std::function<void(float, bool)>([this](float center_freq, bool initialize) {
+                    EBassResonator->update([center_freq](BassResonatorEffect& effect) {
+                        effect.setCenterFreq(center_freq);
+                                       }, initialize);
+                }))},
+            {BASS_RESONATOR_EFFECT_Q,
+                ParamSetter(BASS_RESONATOR_EFFECT_Q, std::function<void(float, bool)>([this](float q, bool initialize) {
+                    EBassResonator->update([q](BassResonatorEffect& effect) {
+                        effect.setQ(q);
+                    }, initialize);
+                }))},
         };
     }
 
@@ -408,7 +440,7 @@ public:
 
         /* Ensure that all effects requiring planar buffers are placed consecutively in the processing chain */
         audio_stream >> *EDeviceSimulation >> *EChannelBalance >> *EDiffSurrounding
-                     >> *EIIREQualizer >> *EEvenHarmonic >> *EBass >> *EClarity 
+                     >> *EIIREQualizer >> *EEvenHarmonic >> *EBass >> *EClarity >> *EBassResonator
                      >> *EVirtualBass >> *EReverb 
                      /* planar buffer start */
                      >> *EConvolve >> *EScript
@@ -438,6 +470,7 @@ public:
         ELowCat->reset();
         EVirtualBass->reset();
         EDeviceSimulation->reset();
+        EBassResonator->reset();
     }
 };
 #endif
