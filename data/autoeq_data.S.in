@@ -1,0 +1,10 @@
+/* Embedded AutoEq payload, generated from output_csv by
+ * tools/convert_autoeq.py. Raw 3 x float32 rows, no header. */
+
+	.section .rodata
+	.balign 4
+	.global autoeq_data_start
+autoeq_data_start:
+	.incbin "@AUTOEQ_BIN@"
+	.global autoeq_data_end
+autoeq_data_end:

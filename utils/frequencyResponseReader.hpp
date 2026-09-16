@@ -5,28 +5,33 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include <fstream>
-#include <sstream>
 #include <algorithm>
 #include <cstdlib>
-
-#ifdef __ANDROID__
-#include <android/asset_manager.h>
-#endif
+#include <bit>
+#include <cstdint>
 
 #include "utils.h"
-#include "parameterEqParser.hpp"
+#include "debug.hpp"
+
+#ifdef __ANDROID__
+extern "C" {
+extern const unsigned char autoeq_data_start[];
+extern const unsigned char autoeq_data_end[];
+}
+#else
+inline const unsigned char* autoeq_data_start = nullptr;
+inline const unsigned char* autoeq_data_end = nullptr;
+
+inline void autoeq_bind_resource(const void* start, const void* end) {
+    autoeq_data_start = static_cast<const unsigned char*>(start);
+    autoeq_data_end = static_cast<const unsigned char*>(end);
+}
+#endif
 
 class FrequencyResponseReader: public Utils {
 public:
     FrequencyResponseReader() = default;
     ~FrequencyResponseReader() = default;
-
-#ifdef __ANDROID__
-    static void setAssetManager(AAssetManager* manager) {
-        asset_manager = manager;
-    }
-#endif
 
     auto get(const std::string& header) -> const std::vector<float>& {
         return data[header];
@@ -36,90 +41,74 @@ public:
         return headers;
     }
 
-    void load(std::string_view path, float clamp = 9.0f) {
-        readCsv(path, clamp);
-    }
-
-private:
-#ifdef __ANDROID__
-    inline static AAssetManager* asset_manager = nullptr;
-#endif
-
-    void readCsv(std::string_view path, float clamp = 9.0f) {
+    void load(std::string_view spec, float clamp = 9.0f) {
         headers.clear();
         data.clear();
 
-        std::stringstream ss;
-
-        if (!readIntoStream(std::string(path), ss)) {
+        if (spec.rfind("autoeq@", 0) != 0) {
             return;
         }
 
-        std::string line;
-        std::vector<std::string_view> line_data;
-
-        std::getline(ss, line);
-
-        if (line.size() >= 3 && line.compare(0, 3, "\xEF\xBB\xBF") == 0) {
-            line.erase(0, 3);
-        }
-        if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
-        }
-        line_data = ParameterEqParser::split(line, ',');
-        for (auto item: line_data) {
-            headers.push_back(std::string(item));
+        auto at = spec.find('@');
+        auto colon = spec.find(':');
+        if (at == std::string_view::npos || colon == std::string_view::npos || colon <= at) {
+            return;
         }
 
-        while (std::getline(ss, line)) {
-            if (!line.empty() && line.back() == '\r') {
-                line.pop_back();
-            }
-            line_data.clear();
-            line_data = ParameterEqParser::split(line, ',');
+        auto row_bytes = 3 * sizeof(uint16_t);
+        auto offset = std::strtoull(std::string(spec.substr(at + 1, colon - at - 1)).c_str(), nullptr, 10);
+        auto rows = std::strtoull(std::string(spec.substr(colon + 1)).c_str(), nullptr, 10);
+        auto total = static_cast<size_t>(autoeq_data_end - autoeq_data_start);
 
-            if (line_data.size() != headers.size()) {
-                continue;
-            }
+        if (offset + rows * row_bytes > total) {
+            LOG_E("autoeq range out of bounds: offset=%zu rows=%zu total=%zu", offset, rows, total);
+            return;
+        }
 
-            for (int i = 0; i < (int)headers.size(); i++) {
-                float v = std::strtof(std::string(line_data[i]).c_str(), nullptr);
-                if (headers[i] != "frequency") {
-                    v = std::clamp(v, -clamp, clamp);
-                }
-                data[headers[i]].emplace_back(v);
-            }
+        headers = {"frequency", "equalization", "error"};
+        auto& freq = data["frequency"];
+        auto& eq = data["equalization"];
+        auto& err = data["error"];
+        freq.reserve(rows);
+        eq.reserve(rows);
+        err.reserve(rows);
+
+        const auto* it = reinterpret_cast<const uint16_t*>(autoeq_data_start + offset);
+        for (size_t i = 0; i < rows; i++) {
+            freq.emplace_back(halfBitsToFloat(*it++));
+            eq.emplace_back(std::clamp(halfBitsToFloat(*it++), -clamp, clamp));
+            err.emplace_back(std::clamp(halfBitsToFloat(*it++), -clamp, clamp));
         }
     }
 
-    bool readIntoStream(const std::string& path, std::stringstream& out) {
-#ifdef __ANDROID__
-        if (asset_manager != nullptr) {
-            AAsset* asset = AAssetManager_open(asset_manager, path.c_str(), AASSET_MODE_BUFFER);
+    /* IEEE 754 binary16 bit pattern -> float. */
+    static float halfBitsToFloat(uint16_t h) {
+        const uint32_t sign = static_cast<uint32_t>(h & 0x8000u) << 16;
+        const uint32_t exponent = (h >> 10) & 0x1Fu;
+        uint32_t mantissa = h & 0x03FFu;
 
-            if (asset != nullptr) {
-                off_t len = AAsset_getLength(asset);
-                std::vector<char> buf(len > 0 ? len : 1);
-                int n = AAsset_read(asset, buf.data(), buf.size());
-                AAsset_close(asset);
-
-                if (n > 0) {
-                    out.write(buf.data(), n);
-                    return true;
+        uint32_t bits;
+        if (exponent == 0) {
+            if (mantissa == 0) {
+                bits = sign;
+            } else {
+                uint32_t e = 127 - 15 + 1;
+                while ((mantissa & 0x0400u) == 0) {
+                    mantissa <<= 1;
+                    e--;
                 }
-
-                return false;
+                mantissa &= 0x03FFu;
+                bits = sign | (e << 23) | (mantissa << 13);
             }
+        } else if (exponent == 0x1Fu) {
+            bits = sign | 0x7F800000u | (mantissa << 13);
+        } else {
+            bits = sign | ((exponent + 112u) << 23) | (mantissa << 13);
         }
-#endif
-        std::ifstream file(path);
-        if (!file.is_open()) {
-            return false;
-        }
-        out << file.rdbuf();
-        return true;
+        return std::bit_cast<float>(bits);
     }
 
+private:
     std::unordered_map<std::string, std::vector<float>> data;
     std::vector<std::string> headers;
 };

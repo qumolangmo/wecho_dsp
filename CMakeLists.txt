@@ -39,6 +39,15 @@ set(WECHO_DSP_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/utils.cpp
 )
 
+if (ANDROID)
+    set(AUTOEQ_BIN ${CMAKE_CURRENT_SOURCE_DIR}/data/autoeq.bin)
+    configure_file(data/autoeq_data.S.in ${CMAKE_CURRENT_BINARY_DIR}/autoeq_data.S @ONLY)
+    set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/autoeq_data.S PROPERTIES
+        OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/data/autoeq.bin
+    )
+    list(APPEND WECHO_DSP_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/autoeq_data.S)
+endif()
+
 add_library(wecho_dsp STATIC ${WECHO_DSP_SOURCES})
 
 if (ANDROID)
