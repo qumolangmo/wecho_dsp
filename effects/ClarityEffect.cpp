@@ -45,7 +45,8 @@ void ClarityEffect::reset() {
 }
 
 void ClarityEffect::setGain(int gain) {
-    this->gain.store(2.0f + 3.0f * std::sqrt(gain / 15.0f), std::memory_order_release);
+    /* store the raw dB setting; the internal gain is derived in run() */
+    this->gain.store(static_cast<float>(gain), std::memory_order_release);
 }
 
 void ClarityEffect::copyParamsFrom(const ClarityEffect& other) {
@@ -59,9 +60,7 @@ void ClarityEffect::copyParamsFrom(const ClarityEffect& other) {
 void ClarityEffect::run(std::span<float> audio) {
     static_assert((bufferType() == BufferType::INTERLEAVED), "ClarityEffect run with non-interleaved buffer type");
 
-    float _gain = gain.load(std::memory_order_relaxed);
-
-    if (std::fabs(_gain) < 0.00001f) return;
+    float _gain = 2.0f + 3.0f * std::sqrt(gain.load(std::memory_order_relaxed) / 15.0f);
 
     for (int i = 0; i < audio.size(); i += 2) {
         float prev_l = audio[i];

@@ -44,8 +44,7 @@ void BassEffect::reset() {
 }
 
 void BassEffect::setGain(int gain) {
-    gain = std::max(0, std::min(15, gain));
-    this->gain.store(std::pow(10.0f, gain / 20.0f), std::memory_order_release);
+    this->gain.store(gain, std::memory_order_release);
 
     float freq = center_freq.load(std::memory_order_acquire);
     float q = Q.load(std::memory_order_acquire);
@@ -54,7 +53,6 @@ void BassEffect::setGain(int gain) {
 }
 
 void BassEffect::setQ(float Q) {
-    Q = std::max(0.1f, std::min(1.5f, Q));
     this->Q.store(Q, std::memory_order_release);
 
     float freq = center_freq.load(std::memory_order_acquire);
@@ -83,9 +81,7 @@ void BassEffect::copyParamsFrom(const BassEffect& other) {
 void BassEffect::run(std::span<float> audio) {
     static_assert((bufferType() == BufferType::INTERLEAVED), "BassEffect run with non-interleaved buffer type");
 
-    float _gain = gain.load(std::memory_order_relaxed);
-
-    if (std::fabs(_gain) < 0.00001f) return;
+    float _gain = std::pow(10.0f, gain.load(std::memory_order_relaxed) / 20.0f);
 
     for (int i = 0; i < audio.size(); i += 2) {
         int l_idx = i;
