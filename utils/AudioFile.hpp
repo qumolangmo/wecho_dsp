@@ -59,6 +59,8 @@
 #include <cmath>
 #include <array>
 
+#include "utils.h"
+
 // disable some warnings on Windows
 #if defined (_MSC_VER)
     __pragma(warning (push))
@@ -491,7 +493,7 @@ bool AudioFile<T>::load (const std::string& filePath)
     /* reserve 1MB data + 100B metadata */
     static std::vector<uint8_t> fileData(1024 * 1024 + 100);
 
-    std::ifstream file (filePath, std::ios::binary);
+    std::ifstream file (utf8Path(filePath), std::ios::binary);
     
     // check the file exists
     if (! file.good())
@@ -1141,7 +1143,7 @@ bool AudioFile<T>::encodeAiffFile (std::vector<uint8_t>& fileData)
 template <class T>
 bool AudioFile<T>::writeDataToFile (const std::vector<uint8_t>& fileData, std::string filePath)
 {
-    std::ofstream outputFile (filePath, std::ios::binary);
+    std::ofstream outputFile (utf8Path(filePath), std::ios::binary);
 
     if (!outputFile.is_open())
     {

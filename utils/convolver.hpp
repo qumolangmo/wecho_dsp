@@ -29,6 +29,8 @@
 #include "../utils/AudioFile.hpp"
 #include <memory>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <span>
 #include "utils.h"
 
@@ -112,14 +114,19 @@ private:
 public:
     static void initWisdom(std::string_view path) {
         wisdom_path = path;
-        auto dir = std::filesystem::path(wisdom_path).parent_path();
+        auto wpath = utf8Path(wisdom_path);
+        auto dir = wpath.parent_path();
 
         if (!dir.empty() && !std::filesystem::exists(dir)) {
             std::filesystem::create_directories(dir);
         }
 
-        if (std::filesystem::exists(wisdom_path)) {
-            fftwf_import_wisdom_from_filename(wisdom_path.c_str());
+        if (std::filesystem::exists(wpath)) {
+            std::ifstream in(wpath, std::ios::binary);
+            std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            if (!content.empty()) {
+                fftwf_import_wisdom_from_string(content.c_str());
+            }
         } else {
             FFTWFComplexArray tmp(getSamplesPerChannel() * 2);
             FFTWFComplexArray tmp2(getSamplesPerChannel() * 2);
@@ -129,7 +136,13 @@ public:
             FFTWFPlan forward_plan_outplace(getSamplesPerChannel() * 2, FFTW_FORWARD, tmp, tmp2, FFTW_MEASURE);
             FFTWFPlan backward_plan_outplace(getSamplesPerChannel() * 2, FFTW_BACKWARD, tmp, tmp2, FFTW_MEASURE);
 
-            fftwf_export_wisdom_to_filename(wisdom_path.c_str());
+            if (char* text = fftwf_export_wisdom_to_string()) {
+                std::ofstream out(wpath, std::ios::binary);
+                if (out.is_open()) {
+                    out << text;
+                }
+                fftwf_free(text);
+            }
         }
     }
 

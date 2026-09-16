@@ -26,6 +26,7 @@
 #include <csignal>
 #endif
 #include "../utils/debug.hpp"
+#include "../utils/utils.h"
 
 static void registerAllSymbols(TCCState* state) {
     struct { const char* name; void* addr; } syms[] = {
@@ -137,7 +138,7 @@ std::string_view ScriptEffect::getCacheDir() {
 }
 
 static std::string readFile(const char* path) {
-    std::ifstream file(path);
+    std::ifstream file(utf8Path(path));
 
     if (!file.is_open()) {
         return "";

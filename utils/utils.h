@@ -20,6 +20,13 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
+#include <filesystem>
+#include <string>
+
+inline std::filesystem::path utf8Path(const std::string& utf8) {
+    return std::filesystem::path(std::u8string(utf8.begin(), utf8.end()));
+}
+
 class Utils {
 private:
     static int sample_rate;
