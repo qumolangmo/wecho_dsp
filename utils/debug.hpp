@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (C) 2026 qumolangmo
  *
  * This file is part of Wecho.
@@ -62,7 +62,7 @@ inline const char* get_filename(const char* path) {
 #define LOG_D(fmt, ...)\
     do {\
         std::string __tmp_buffer;\
-        const int __tmp_len = _vscprintf("[%s] [%s:%d] " fmt "\n", \
+        const int __tmp_len = _scprintf("[%s] [%s:%d] " fmt "\n", \
                                          LOG_TAG_NATIVE, get_filename(__FILE__), __LINE__, \
                                          ##__VA_ARGS__);\
         __tmp_buffer.resize(__tmp_len + 1);\
