@@ -56,9 +56,9 @@ public:
         }
 
         auto row_bytes = 3 * sizeof(uint16_t);
-        auto offset = std::strtoull(std::string(spec.substr(at + 1, colon - at - 1)).c_str(), nullptr, 10);
-        auto rows = std::strtoull(std::string(spec.substr(colon + 1)).c_str(), nullptr, 10);
-        auto total = static_cast<size_t>(autoeq_data_end - autoeq_data_start);
+        size_t offset = static_cast<size_t>(std::strtoull(std::string(spec.substr(at + 1, colon - at - 1)).c_str(), nullptr, 10));
+        size_t rows = static_cast<size_t>(std::strtoull(std::string(spec.substr(colon + 1)).c_str(), nullptr, 10));
+        size_t total = static_cast<size_t>(autoeq_data_end - autoeq_data_start);
 
         if (offset + rows * row_bytes > total) {
             LOG_E("autoeq range out of bounds: offset=%zu rows=%zu total=%zu", offset, rows, total);
