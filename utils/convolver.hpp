@@ -28,6 +28,7 @@
 
 #include "../utils/AudioFile.hpp"
 #include <memory>
+#include <mutex>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -98,8 +99,11 @@ public:
 
 class FFTWFPlan: public Utils {
 private:
+    static inline std::recursive_mutex planner_mutex;
+
     struct FFTWFPlanDeleter {
         void operator()(fftwf_plan ptr) {
+            std::lock_guard<std::recursive_mutex> lock(planner_mutex);
             fftwf_destroy_plan(ptr);
         }
     };
@@ -113,6 +117,7 @@ private:
 
 public:
     static void initWisdom(std::string_view path) {
+        std::lock_guard<std::recursive_mutex> lock(planner_mutex);
         wisdom_path = path;
         auto wpath = utf8Path(wisdom_path);
         auto dir = wpath.parent_path();
@@ -136,13 +141,7 @@ public:
             FFTWFPlan forward_plan_outplace(getSamplesPerChannel() * 2, FFTW_FORWARD, tmp, tmp2, FFTW_MEASURE);
             FFTWFPlan backward_plan_outplace(getSamplesPerChannel() * 2, FFTW_BACKWARD, tmp, tmp2, FFTW_MEASURE);
 
-            if (char* text = fftwf_export_wisdom_to_string()) {
-                std::ofstream out(wpath, std::ios::binary);
-                if (out.is_open()) {
-                    out << text;
-                }
-                fftwf_free(text);
-            }
+            fftwf_export_wisdom_to_filename(wpath.string().c_str());
         }
     }
 
@@ -151,6 +150,7 @@ public:
         , sign(sign)
         , flags(flags) {
 
+        std::lock_guard<std::recursive_mutex> lock(planner_mutex);
         plan.reset(fftwf_plan_dft_1d(n, in.get(), out.get(), sign, flags));
     }
 
