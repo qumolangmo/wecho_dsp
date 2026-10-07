@@ -141,16 +141,16 @@ private:
                         effect.setGain(gain);
                     }, initialize);
                 }))},
-            {BASS_EFFECT_CENTER_FREQ,
-                ParamSetter(BASS_EFFECT_CENTER_FREQ, std::function<void(int, bool)>([this](int center_freq, bool initialize) {
-                    EBass->update([center_freq](BassEffect& effect) {
-                        effect.setCenterFreq(center_freq);
+            {BASS_EFFECT_DEEP,
+                ParamSetter(BASS_EFFECT_DEEP, std::function<void(float, bool)>([this](float deep, bool initialize) {
+                    EBass->update([deep](BassEffect& effect) {
+                        effect.setDeep(deep);
                     }, initialize);
                 }))},
-            {BASS_EFFECT_Q,
-                ParamSetter(BASS_EFFECT_Q, std::function<void(float, bool)>([this](float Q, bool initialize) {
-                    EBass->update([Q](BassEffect& effect) {
-                        effect.setQ(Q);
+            {BASS_EFFECT_PUNCH,
+                ParamSetter(BASS_EFFECT_PUNCH, std::function<void(float, bool)>([this](float punch, bool initialize) {
+                    EBass->update([punch](BassEffect& effect) {
+                        effect.setPunch(punch);
                     }, initialize);
                 }))},
             {CLARITY_EFFECT_ENABLED,

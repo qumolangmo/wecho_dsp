@@ -71,20 +71,34 @@ public:
     void reset() override;
 
     void setGain(int gain);
-    void setQ(float Q);
-    void setCenterFreq(float center_freq);
+    void setDeep(float deep);
+    void setPunch(float punch);
 
     void copyParamsFrom(const BassEffect& other);
     static constexpr BufferType bufferType() { return BufferType::INTERLEAVED; }
 
-    BassEffect(bool enabled, int gain, float Q, float center_freq);
+    BassEffect(bool enabled, int gain, float deep, float punch);
     ~BassEffect();
 
 private:
-    std::atomic<float> gain;
-    std::atomic<float> Q;
-    std::atomic<float> center_freq;
-    Biquad<1> filter[2];
+    std::atomic<int> gain;
+    std::atomic<float> deep;
+    std::atomic<float> punch;
+
+    LinkwitzRiley4Order<HIGH_PASS> hp_20_s;
+    Biquad<1> hp_20_m;
+    Biquad<1> low_gain1, low_gain2;
+    Biquad<1> lp_env;
+    Biquad<1> sub_lp, sub_lp2;
+
+    float attack_coeff, release_coeff;
+    float env_smooth;
+    float prev_low;
+
+    float sub_flip, prev_sub;
+
+    float comp_env;
+    float comp_attack_coeff, comp_release_coeff;
 };
 
 class ClarityEffect: public Effect {
